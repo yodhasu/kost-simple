@@ -57,6 +57,16 @@ class TenantResponse(TenantBase):
         from_attributes = True
 
 
+
 class TenantDetailResponse(TenantResponse):
     """Schema for detailed tenant response with relationships."""
     transactions: List[TransactionResponse] = []
+
+
+class TenantListResponse(BaseModel):
+    """Schema for tenant list response."""
+    items: List[TenantResponse]
+    total: int
+    page: int
+    page_size: int
+

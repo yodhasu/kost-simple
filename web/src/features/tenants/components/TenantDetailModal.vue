@@ -21,26 +21,16 @@
           <div class="avatar-large" :style="{ backgroundColor: getAvatarColor(tenant.name) }">
             {{ getInitials(tenant.name) }}
           </div>
-          <div class="status-badge-floating" :class="`status-${tenant.status}`">
-            {{ getStatusLabel(tenant.status) }}
-          </div>
+
           
           <h2 class="profile-name">{{ tenant.name }}</h2>
           <div class="profile-meta">
-            <span class="meta-tag" :class="{'tag-late': isLate, 'tag-ok': !isLate}">
-              {{ isLate ? 'Menunggak' : 'Lancar' }}
-            </span>
             <span class="meta-text">Masuk sejak {{ formatDateMonth(tenant.start_date) }}</span>
           </div>
         </div>
 
         <!-- Info Grid -->
         <div class="info-grid">
-          <div class="info-card">
-            <label>Nomor Unit</label>
-            <p class="info-value">{{ tenant.kost_id ? 'Unit Kost' : '-' }}</p> 
-            <!-- TODO: Display actual unit/room name if available -->
-          </div>
           <div class="info-card">
             <label>Harga Sewa</label>
             <p class="info-value">{{ formatCurrency(tenant.rent_price) }}/bln</p>
@@ -50,9 +40,10 @@
             <p class="info-value">{{ tenant.phone || '-' }}</p>
           </div>
           <div class="info-card">
-            <label>Pekerjaan</label>
-            <p class="info-value">-</p> 
-            <!-- Placeholder as job is not in model -->
+            <label>Status</label>
+            <span class="status-badge" :class="`status-${tenant.status}`">
+              {{ getStatusLabel(tenant.status) }}
+            </span>
           </div>
         </div>
 
@@ -81,19 +72,12 @@
           </div>
         </div>
 
-        <!-- Emergency Contact -->
-        <div class="section-title-row">
-          <h3>Kontak Darurat</h3>
-        </div>
-        <p class="emergency-contact">
-           - 
-           <!-- Placeholder -->
-        </p>
+        <!-- Emergency Contact Removed -->
 
         <!-- Actions -->
         <div class="modal-actions">
           <a 
-            v-if="tenant.phone"
+            v-if="tenant.status !== 'inactive' && tenant.phone"
             :href="getWhatsAppLink(tenant.phone)"
             target="_blank"
             class="btn-whatsapp"
@@ -101,8 +85,15 @@
             <span class="material-symbols-outlined">chat</span>
             Beritahu via WhatsApp
           </a>
-          
-          <div class="action-row">
+          <a 
+            v-else-if="tenant.status !== 'inactive' && !tenant.phone"
+            class="btn-whatsapp-disabled"
+            disabled
+          >
+            <span class="material-symbols-outlined">chat</span>
+            Nomor WhatsApp Tidak Tersedia
+          </a>
+          <div class="action-row" v-if="tenant.status !== 'inactive'">
             <button class="btn-outline">Tangguhkan</button>
             <button class="btn-outline text-red" @click="$emit('set-inactive')">Set Inaktif</button>
           </div>
@@ -128,8 +119,7 @@ const emit = defineEmits<{
 const loading = ref(true)
 const tenant = ref<TenantDetail | null>(null)
 
-// Mocked logic for "Late" status since we don't have it in backend yet
-const isLate = ref(false)
+
 
 onMounted(async () => {
   try {
@@ -154,11 +144,11 @@ function getAvatarColor(name: string): string {
 
 function getStatusLabel(status: string): string {
   const map: Record<string, string> = { 
-    aktif: 'DP', 
+    aktif: 'Aktif', 
     dp: 'DP', 
-    inactive: 'Keluar' 
+    inactive: 'Tidak Aktif' 
   }
-  return map[status] || 'Aktif'
+  return map[status] || status
 }
 
 function formatCurrency(amount: number | null): string {
@@ -264,15 +254,7 @@ function getWhatsAppLink(phone: string | null): string {
   margin-bottom: 1rem;
 }
 
-.status-badge-floating {
-  position: absolute;
-  top: -5px;
-  right: 50%;
-  transform: translateX(350%); /* Adjust based on positioning preference, image shows it centered above or badge-like. Image shows initials as avatar, badge is likely separate. */
-  /* Actually image has Avatar with "DP" on it? No, "DP" is the avatar text. */
-  /* The Badge "DP" in image is separate? No, it looks like Avatar. */
-  /* Status is "Menunggak". */
-}
+
 
 .profile-name {
   font-size: 1.25rem;
@@ -440,6 +422,23 @@ function getWhatsAppLink(phone: string | null): string {
   border-radius: 8px;
   text-decoration: none;
   transition: opacity 0.2s;
+  cursor: pointer;
+}
+
+
+.btn-whatsapp-disabled {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #9CA3AF;
+  color: white;
+  font-weight: 600;
+  padding: 0.875rem;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: opacity 0.2s;
+  cursor: pointer;
 }
 
 .btn-whatsapp:hover {
@@ -487,5 +486,29 @@ function getWhatsAppLink(phone: string | null): string {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Status Badge */
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-aktif {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.status-dp {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.status-inactive {
+  background: #F3F4F6;
+  color: #6B7280;
 }
 </style>

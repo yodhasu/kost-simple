@@ -170,8 +170,9 @@ async function loadKosts() {
     kostOptions.value = response.items
     
     // Auto-select if only one kost and no selection yet
-    if (!form.value.kost_id && response.items.length === 1) {
-      form.value.kost_id = response.items[0].id
+    const firstKost = response.items[0]
+    if (!form.value.kost_id && response.items.length === 1 && firstKost) {
+      form.value.kost_id = firstKost.id
     }
   } catch (e) {
     console.error('Failed to load kosts', e)

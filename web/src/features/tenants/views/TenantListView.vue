@@ -49,9 +49,9 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="tenant in tenants" :key="tenant.id">
+          <tr v-for="tenant in tenants" :key="tenant.id" @click="openDetailModal(tenant)" style="cursor: pointer" class="tenant-row">
             <td>
-              <div class="tenant-cell" @click="openDetailModal(tenant)" style="cursor: pointer">
+              <div class="tenant-cell">
                 <div class="tenant-avatar" :style="{ backgroundColor: getAvatarColor(tenant.name) }">
                   {{ getInitials(tenant.name) }}
                 </div>
@@ -68,10 +68,10 @@
                 {{ getStatusLabel(tenant.status) }}
               </span>
             </td>
-            <td class="action-cell">
+            <td class="action-cell" @click.stop>
               <template v-if="tenant.status !== 'inactive'">
-                <button class="action-btn action-edit" @click="openEditModal(tenant)">Edit</button>
-                <button class="action-btn action-delete" @click="confirmDelete(tenant)">Hapus</button>
+                <button class="action-btn action-edit" @click.stop="openEditModal(tenant)">Edit</button>
+                <button class="action-btn action-delete" @click.stop="confirmDelete(tenant)">Hapus</button>
               </template>
             </td>
           </tr>
@@ -127,6 +127,7 @@
       v-if="showDetailModal"
       :tenant-id="selectedDetailId"
       @close="closeDetailModal"
+      @set-inactive="handleSetInactive"
     />
 
     <!-- Delete Confirmation -->
@@ -234,6 +235,14 @@ function openDetailModal(tenant: Tenant) {
 function closeDetailModal() {
   showDetailModal.value = false
   selectedDetailId.value = ''
+}
+
+function handleSetInactive() {
+  const tenant = tenants.value.find(t => t.id === selectedDetailId.value)
+  if (tenant) {
+    closeDetailModal()
+    confirmDelete(tenant)
+  }
 }
 
 function openEditModal(tenant: Tenant) {
@@ -465,6 +474,10 @@ onMounted(() => {
 
 .tenant-table tr:hover {
   background: #FAFAFA;
+}
+
+.tenant-row {
+  transition: background-color 0.15s ease;
 }
 
 /* Tenant Cell */
