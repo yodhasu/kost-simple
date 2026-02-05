@@ -10,7 +10,7 @@ const httpClient: AxiosInstance = axios.create({
   },
 })
 
-// Request interceptor - Add Firebase ID token and Region ID
+// Request interceptor - Add Firebase ID token
 httpClient.interceptors.request.use(
   async (requestConfig: InternalAxiosRequestConfig) => {
     const user = auth.currentUser
@@ -18,28 +18,28 @@ httpClient.interceptors.request.use(
       const token = await user.getIdToken()
       requestConfig.headers.Authorization = `Bearer ${token}`
     }
-
-    // Add region_id to params if available
-    // We import the store dynamically to avoid initialization issues
-    try {
-      const { useUserStore } = await import('../../stores/userStore')
-      const userStore = useUserStore()
-      if (userStore.regionId) {
-        requestConfig.params = { 
-          ...requestConfig.params, 
-          region_id: userStore.regionId 
-        }
-      }
-    } catch (e) {
-      // Store might not be ready or authorized yet, ignore
-    }
-
     return requestConfig
   },
   (error: AxiosError) => {
     return Promise.reject(error)
   }
 )
+
+/**
+ * Setup interceptors that depend on the User Store.
+ * Call this from main.ts after store initialization.
+ */
+export function setupAxiosInterceptors(userStore: any) {
+  httpClient.interceptors.request.use((config) => {
+    if (userStore.regionId) {
+      config.params = { 
+        ...config.params, 
+        region_id: userStore.regionId 
+      }
+    }
+    return config
+  })
+}
 
 // Response interceptor
 httpClient.interceptors.response.use(
