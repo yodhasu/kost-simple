@@ -236,32 +236,108 @@ async function onPeriodChange() {
   }
 }
 
-// Chart data from API
-const chartData = computed(() => ({
-  labels: incomeTrend.value.items.map(i => i.label),
-  datasets: [{
-    data: incomeTrend.value.items.map(i => Number(i.amount) / 1000000),
-    borderColor: '#0f766d',
-    backgroundColor: (context: any) => {
-      const ctx = context.chart.ctx
-      const gradient = ctx.createLinearGradient(0, 0, 0, 200)
-      gradient.addColorStop(0, 'rgba(15, 118, 109, 0.3)')
-      gradient.addColorStop(1, 'rgba(15, 118, 109, 0.02)')
-      return gradient
-    },
-    fill: true,
-    tension: 0.4,
-    pointRadius: 0,
-    pointHoverRadius: 6,
-    pointBackgroundColor: '#0f766d',
-    borderWidth: 2,
-  }],
-}))
+// Chart data from API - process to carry forward 0 values for past weeks
+const chartData = computed(() => {
+  const items = incomeTrend.value.items
+  const now = new Date()
+  
+  // Process data: if a week has 0 amount AND is not in the future, use previous week's value
+  const processedAmounts: number[] = []
+  
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (!item) continue
+    
+    const amount = Number(item.amount)
+    
+    // Check if this is a future week by parsing the label
+    // Labels are like "Jan W1", "Feb W2", etc.
+    const isFutureWeek = isLabelInFuture(item.label, now)
+    
+    if (amount === 0 && !isFutureWeek && i > 0) {
+      // Use previous value for stagnant line
+      processedAmounts.push(processedAmounts[i - 1] ?? 0)
+    } else {
+      processedAmounts.push(amount / 1000000)
+    }
+  }
+  
+  return {
+    labels: items.map(i => i.label),
+    datasets: [{
+      data: processedAmounts,
+      borderColor: '#0f766d',
+      backgroundColor: (context: any) => {
+        const ctx = context.chart.ctx
+        const gradient = ctx.createLinearGradient(0, 0, 0, 200)
+        gradient.addColorStop(0, 'rgba(15, 118, 109, 0.3)')
+        gradient.addColorStop(1, 'rgba(15, 118, 109, 0.02)')
+        return gradient
+      },
+      fill: true,
+      tension: 0.4,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      pointBackgroundColor: '#0f766d',
+      borderWidth: 2,
+    }],
+  }
+})
+
+/**
+ * Check if a label is in the future
+ * Handles formats: "Minggu 1", "Minggu 2" (month view) or "Feb W1" (semester/year view)
+ */
+function isLabelInFuture(label: string, now: Date): boolean {
+  const currentWeekOfMonth = Math.ceil(now.getDate() / 7)
+  const currentMonth = now.getMonth()
+  
+  // Handle "Minggu X" format (This Month view)
+  if (label.startsWith('Minggu')) {
+    const weekNum = parseInt(label.replace('Minggu ', '') || '1')
+    return weekNum > currentWeekOfMonth
+  }
+  
+  // Handle "Mon WX" format (Semester/Year view)
+  const monthMap: Record<string, number> = {
+    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Mei': 4, 'Jun': 5,
+    'Jul': 6, 'Agu': 7, 'Sep': 8, 'Okt': 9, 'Nov': 10, 'Des': 11
+  }
+  
+  const parts = label.split(' ')
+  if (parts.length < 2) return false
+  
+  const monthStr = parts[0]
+  const weekStr = parts[1]
+  
+  const month = monthMap[monthStr ?? '']
+  if (month === undefined) return false
+  
+  const weekNum = parseInt(weekStr?.replace('W', '') ?? '1')
+  
+  // If month is in the future
+  if (month > currentMonth) return true
+  
+  // If same month but week is in the future
+  if (month === currentMonth && weekNum > currentWeekOfMonth) return true
+  
+  return false
+}
 
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          const value = context.raw * 1000000 // Convert back from millions
+          return `Rp ${value.toLocaleString('id-ID')}`
+        },
+      },
+    },
+  },
   scales: {
     x: {
       grid: { display: false },

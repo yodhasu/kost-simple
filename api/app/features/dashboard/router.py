@@ -21,21 +21,7 @@ from app.features.dashboard.service import DashboardService
 router = APIRouter()
 
 
-async def get_current_user_region(
-    firebase_uid: str = Depends(get_current_firebase_uid),
-    db: Session = Depends(get_db),
-) -> Optional[UUID]:
-    """Helper dependency to get current user's region ID."""
-    user_service = UserProfileService(db)
-    profile = user_service.get_by_firebase_uid(firebase_uid)
-    
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User profile not found."
-        )
-    
-    return profile.region_id
+from app.features.common.dependencies import get_current_user_region
 
 
 @router.get("/stats", response_model=DashboardStats)

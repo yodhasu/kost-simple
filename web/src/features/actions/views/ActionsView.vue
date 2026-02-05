@@ -23,39 +23,25 @@
         <span class="action-label">Tambah Pengeluaran</span>
       </div>
 
+      <div class="action-card" @click="handleAddKost">
+        <div class="icon-wrapper bg-teal">
+          <span class="material-symbols-outlined">add_home</span>
+        </div>
+        <span class="action-label">Tambah Kost</span>
+      </div>
+
+      <div class="action-card" @click="handleEditKost">
+        <div class="icon-wrapper bg-indigo">
+          <span class="material-symbols-outlined">edit_square</span>
+        </div>
+        <span class="action-label">Edit Kost</span>
+      </div>
+
       <div class="action-card" @click="handleExportData">
         <div class="icon-wrapper bg-purple">
           <span class="material-symbols-outlined">file_download</span>
         </div>
         <span class="action-label">Ekspor Data</span>
-      </div>
-    </div>
-
-    <!-- Recent Activity -->
-    <div class="activity-section card">
-      <div class="section-header">
-        <div class="header-title">
-          <span class="material-symbols-outlined icon-history">history</span>
-          <h2>Aktivitas Terkini</h2>
-        </div>
-        <a href="#" class="link-see-all">Lihat Semua</a>
-      </div>
-
-      <div class="activity-list">
-        <div v-for="activity in activities" :key="activity.id" class="activity-item">
-          <div class="activity-icon" :class="activity.colorClass">
-            <span class="material-symbols-outlined">{{ activity.icon }}</span>
-          </div>
-          <div class="activity-content">
-            <h3 class="activity-title">{{ activity.title }}</h3>
-            <p class="activity-desc">{{ activity.description }}</p>
-          </div>
-          <span class="activity-time">{{ activity.time }}</span>
-        </div>
-      </div>
-
-      <div class="section-footer">
-        <button class="btn-show-more">Tampilkan lebih banyak</button>
       </div>
     </div>
 
@@ -66,6 +52,56 @@
       @close="closeAddModal"
       @saved="onTenantSaved"
     />
+
+    <UpdatePaymentModal
+      v-if="showPaymentModal"
+      @close="closePaymentModal"
+      @saved="onPaymentSaved"
+    />
+
+    <AddExpenseModal
+      v-if="showExpenseModal"
+      @close="closeExpenseModal"
+      @saved="onExpenseSaved"
+    />
+
+    <KostFormModal
+      v-if="showKostModal"
+      :kost="selectedKost"
+      @close="closeKostModal"
+      @saved="onKostSaved"
+    />
+
+    <!-- Kost Select Modal for Edit -->
+    <div v-if="showKostSelectModal" class="modal-overlay" @click.self="showKostSelectModal = false">
+      <div class="select-modal">
+        <div class="select-header">
+          <h3>Pilih Kost untuk Diedit</h3>
+          <button class="close-btn" @click="showKostSelectModal = false">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="select-body">
+          <div v-if="loadingKosts" class="loading">Memuat...</div>
+          <div v-else-if="kostList.length === 0" class="empty">Tidak ada kost tersedia</div>
+          <div v-else class="kost-list">
+            <div 
+              v-for="kost in kostList" 
+              :key="kost.id" 
+              class="kost-item"
+              @click="selectKostForEdit(kost)"
+            >
+              <span class="material-symbols-outlined">home</span>
+              <div class="kost-info">
+                <span class="kost-name">{{ kost.name }}</span>
+                <span class="kost-address">{{ kost.address || 'Alamat belum diisi' }}</span>
+              </div>
+              <span class="material-symbols-outlined">chevron_right</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -73,45 +109,20 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import TenantFormModal from '../../tenants/components/TenantFormModal.vue'
+import UpdatePaymentModal from '../components/UpdatePaymentModal.vue'
+import AddExpenseModal from '../components/AddExpenseModal.vue'
+import KostFormModal from '../../kosts/components/KostFormModal.vue'
+import kostService, { type Kost } from '../../kosts/services/kostService'
 
 const router = useRouter()
 const showAddModal = ref(false)
-
-// Mock Data
-const activities = ref([
-  {
-    id: 1,
-    title: 'Pembayaran Diterima',
-    description: 'Budi Santoso telah membayar sewa untuk Unit 102 (Agustus 2023).',
-    time: 'Baru saja',
-    icon: 'check',
-    colorClass: 'bg-green-light text-green'
-  },
-  {
-    id: 2,
-    title: 'Penyewa Baru Ditambahkan',
-    description: 'Siti Aminah ditambahkan ke Unit 201.',
-    time: '2 jam lalu',
-    icon: 'person_add',
-    colorClass: 'bg-blue-light text-blue'
-  },
-  {
-    id: 3,
-    title: 'Laporan Kerusakan',
-    description: 'AC di Unit 105 dilaporkan tidak dingin.',
-    time: 'Kemarin',
-    icon: 'build',
-    colorClass: 'bg-orange-light text-orange'
-  },
-  {
-    id: 4,
-    title: 'Ekspor Data Bulanan',
-    description: 'Laporan keuangan bulan Juli berhasil diunduh.',
-    time: '2 hari lalu',
-    icon: 'file_download',
-    colorClass: 'bg-purple-light text-purple'
-  }
-])
+const showPaymentModal = ref(false)
+const showExpenseModal = ref(false)
+const showKostModal = ref(false)
+const showKostSelectModal = ref(false)
+const selectedKost = ref<Kost | null>(null)
+const kostList = ref<Kost[]>([])
+const loadingKosts = ref(false)
 
 // Methods
 function handleAddTenant() {
@@ -124,17 +135,63 @@ function closeAddModal() {
 
 function onTenantSaved() {
   closeAddModal()
-  // Ideally, refresh activity stream here later
 }
 
 function handleUpdatePayment() {
-  // TODO: Implement payment update logic
-  console.log('Update payment clicked')
+  showPaymentModal.value = true
+}
+
+function closePaymentModal() {
+  showPaymentModal.value = false
+}
+
+function onPaymentSaved() {
+  closePaymentModal()
 }
 
 function handleAddExpense() {
-  // TODO: Implement expense logic
-  console.log('Add expense clicked')
+  showExpenseModal.value = true
+}
+
+function closeExpenseModal() {
+  showExpenseModal.value = false
+}
+
+function onExpenseSaved() {
+  closeExpenseModal()
+}
+
+function handleAddKost() {
+  selectedKost.value = null
+  showKostModal.value = true
+}
+
+async function handleEditKost() {
+  loadingKosts.value = true
+  showKostSelectModal.value = true
+  try {
+    const response = await kostService.getAll(1, 100)
+    kostList.value = response.items
+  } catch (e) {
+    console.error('Failed to load kosts', e)
+  } finally {
+    loadingKosts.value = false
+  }
+}
+
+function selectKostForEdit(kost: Kost) {
+  selectedKost.value = kost
+  showKostSelectModal.value = false
+  showKostModal.value = true
+}
+
+function closeKostModal() {
+  showKostModal.value = false
+  selectedKost.value = null
+}
+
+function onKostSaved() {
+  closeKostModal()
 }
 
 function handleExportData() {
@@ -146,14 +203,28 @@ function handleExportData() {
 .actions-view {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  align-items: center;
+  padding: 2rem 1rem;
 }
 
 /* Grid */
 .actions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, 200px);
   gap: 1.5rem;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .actions-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .action-card {
@@ -195,6 +266,7 @@ function handleExportData() {
   font-weight: 600;
   color: var(--text-primary);
   font-size: 0.9375rem;
+  text-align: center;
 }
 
 /* Colors */
@@ -202,132 +274,117 @@ function handleExportData() {
 .bg-green { background: #10B981; }
 .bg-orange { background: #F59E0B; }
 .bg-purple { background: #8B5CF6; }
+.bg-teal { background: #14B8A6; }
+.bg-indigo { background: #6366F1; }
 
-.bg-blue-light { background: #DBEAFE; }
-.bg-green-light { background: #D1FAE5; }
-.bg-orange-light { background: #FEF3C7; }
-.bg-purple-light { background: #EDE9FE; }
-
-.text-blue { color: #2563EB; }
-.text-green { color: #059669; }
-.text-orange { color: #D97706; }
-.text-purple { color: #7C3AED; }
-
-/* Activity Section */
-.activity-section {
-  background: white;
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-
-.header-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.icon-history {
-  color: var(--text-muted);
-}
-
-.header-title h2 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.link-see-all {
-  font-size: 0.875rem;
-  color: var(--primary);
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.link-see-all:hover {
-  text-decoration: underline;
-}
-
-/* Activity List */
-.activity-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.activity-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.activity-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.activity-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+/* Kost Select Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  z-index: 1000;
+  padding: 1rem;
 }
 
-.activity-icon .material-symbols-outlined {
-  font-size: 1.25rem;
+.select-modal {
+  background: white;
+  border-radius: var(--radius-xl, 16px);
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
-.activity-content {
-  flex: 1;
+.select-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-light, #e5e7eb);
 }
 
-.activity-title {
-  font-size: 0.9375rem;
+.select-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
   font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
+  color: var(--text-primary, #111827);
 }
 
-.activity-desc {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.activity-time {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-/* Footer */
-.section-footer {
-  margin-top: 1.5rem;
-  text-align: center;
-}
-
-.btn-show-more {
+.close-btn {
   background: none;
   border: none;
-  color: var(--text-muted);
-  font-size: 0.875rem;
+  padding: 0.5rem;
   cursor: pointer;
-  padding: 0.5rem 1rem;
+  color: var(--text-muted, #9ca3af);
+  border-radius: var(--radius-md, 8px);
 }
 
-.btn-show-more:hover {
-  color: var(--text-primary);
+.close-btn:hover {
+  background: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+.select-body {
+  padding: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.loading, .empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted, #9ca3af);
+}
+
+.kost-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.kost-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.kost-item:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.kost-item > .material-symbols-outlined:first-child {
+  color: var(--primary, #3b82f6);
+}
+
+.kost-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.kost-name {
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.kost-address {
+  font-size: 0.8125rem;
+  color: var(--text-muted, #9ca3af);
+}
+
+.kost-item > .material-symbols-outlined:last-child {
+  color: var(--text-muted, #9ca3af);
 }
 </style>
+

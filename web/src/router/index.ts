@@ -7,6 +7,8 @@ import dashboardRoutes from '../features/dashboard/routes'
 import tenantRoutes from '../features/tenants/routes'
 import authRoutes from '../features/auth/routes'
 import actionsRoutes from '../features/actions/routes'
+import exportRoutes from '../features/export/routes'
+import settingsRoutes from '../features/settings/routes'
 
 const routes: RouteRecordRaw[] = [
   // Auth routes (no layout)
@@ -21,6 +23,8 @@ const routes: RouteRecordRaw[] = [
       ...dashboardRoutes,
       ...tenantRoutes,
       ...actionsRoutes,
+      ...exportRoutes,
+      ...settingsRoutes,
     ],
   },
 ]

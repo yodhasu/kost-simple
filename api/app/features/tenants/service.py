@@ -12,6 +12,7 @@ from sqlalchemy import func
 from app.core.exceptions import NotFoundException
 from app.features.tenants.model import Tenant
 from app.features.tenants.schemas import TenantCreate, TenantUpdate
+from app.features.kosts.model import Kost
 
 
 class TenantsService:
@@ -23,14 +24,26 @@ class TenantsService:
     def get_all(
         self, 
         kost_id: UUID = None,
+        region_id: UUID = None,
         page: int = 1, 
         page_size: int = 10,
         search: str = None
     ) -> tuple[List[Tenant], int]:
-        """Get paginated list of tenants."""
+        """Get paginated list of tenants, optionally filtered by region."""
         query = self.db.query(Tenant)
         
-        # Filter by kost_id if provided
+        # Filter by region_id through kost relationship
+        if region_id:
+            # Get all kost IDs in this region
+            kost_ids_in_region = (
+                self.db.query(Kost.id)
+                .filter(Kost.region_id == region_id)
+                .all()
+            )
+            kost_ids = [k[0] for k in kost_ids_in_region]
+            query = query.filter(Tenant.kost_id.in_(kost_ids))
+            query = query.filter(Tenant.status != "inaktif")
+        # Filter by kost_id if provided (more specific filter)
         if kost_id:
             query = query.filter(Tenant.kost_id == kost_id)
         
@@ -90,5 +103,5 @@ class TenantsService:
         """Soft delete tenant by setting end_date."""
         tenant = self.get_by_id(tenant_id)
         tenant.end_date = date.today()
-        tenant.status = "inactive"
+        tenant.status = "inaktif"
         self.db.commit()

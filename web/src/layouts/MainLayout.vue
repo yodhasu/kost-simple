@@ -16,6 +16,22 @@
 
       <!-- Navigation -->
       <nav class="nav-menu">
+        <!-- Region Selector -->
+        <div class="region-selector" v-if="userRole === 'owner'">
+          <label class="region-label">
+            <span class="material-symbols-outlined">location_on</span>
+            Region
+          </label>
+          <select v-model="selectedRegionId" class="region-select" :disabled="loadingRegions">
+            <option v-if="loadingRegions" value="" disabled>Memuat...</option>
+            <option v-for="region in regions" :key="region.id" :value="region.id">
+              {{ region.name }}
+            </option>
+          </select>
+        </div>
+
+        <div class="nav-divider"></div>
+        
         <router-link
           v-for="item in navItems"
           :key="item.path"
@@ -29,10 +45,10 @@
 
         <div class="nav-divider"></div>
 
-        <router-link to="/settings" class="nav-item" :class="{ active: $route.path === '/settings' }">
+        <!-- <router-link to="/settings" class="nav-item" :class="{ active: $route.path === '/settings' }" v-if="userRole === 'owner'">
           <span class="material-symbols-outlined">settings</span>
           <span class="nav-label">Pengaturan</span>
-        </router-link>
+        </router-link> -->
       </nav>
 
       <!-- Logout -->
@@ -50,10 +66,10 @@
       <header class="main-header">
         <h1 class="page-title">{{ pageTitle }}</h1>
         <div class="header-actions">
-          <div class="notification-btn">
+          <!-- <div class="notification-btn">
             <span class="material-symbols-outlined">notifications</span>
             <span class="notification-dot"></span>
-          </div>
+          </div> -->
           <div class="header-divider"></div>
           <span class="header-date">{{ currentDate }}</span>
         </div>
@@ -68,24 +84,79 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '../shared/composables/useAuth'
+import { useUserStore } from '../shared/stores/userStore'
+import regionService, { type Region } from '../features/regions/services/regionService'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const { userDisplayName, userRole, signOut } = useAuth()
 
-const navItems = [
-  { path: '/', label: 'Beranda', icon: 'dashboard' },
-  { path: '/tenants', label: 'Daftar Penyewa', icon: 'people' },
-  { path: '/payments', label: 'Aksi & Pembayaran', icon: 'payments' },
-  { path: '/export', label: 'Ekspor Data', icon: 'file_download' },
-]
+// Region selector
+const regions = ref<Region[]>([])
+const loadingRegions = ref(true)
+const selectedRegionId = ref<string>('')
+
+onMounted(async () => {
+  await loadRegions()
+})
+
+async function loadRegions() {
+  loadingRegions.value = true
+  try {
+    const response = await regionService.getAll()
+    regions.value = response.items
+    
+    // Set initial selected region
+    // Store already initializes from localStorage, so we just sync the UI
+    if (userStore.regionId && regions.value.find(r => r.id === userStore.regionId)) {
+      selectedRegionId.value = userStore.regionId
+    } else if (regions.value.length > 0) {
+      selectedRegionId.value = regions.value[0]!.id
+    }
+  } catch (e) {
+    console.error('Failed to load regions:', e)
+  } finally {
+    loadingRegions.value = false
+  }
+}
+
+// Watch for region changes and update store
+watch(selectedRegionId, (newRegionId, oldRegionId) => {
+  if (newRegionId) {
+    // Update store state
+    userStore.selectedRegionId = newRegionId
+    
+    // Save to localStorage
+    localStorage.setItem('selected_region_id', newRegionId)
+    
+    // Reload page to refresh data with new region if it's not the initial load
+    if (oldRegionId) {
+      window.location.reload()
+    }
+  }
+})
+
+const navItems = computed(() => {
+  const items = [
+    { path: '/', label: 'Beranda', icon: 'dashboard' },
+    { path: '/tenants', label: 'Daftar Penyewa', icon: 'people' },
+    { path: '/payments', label: 'Aksi & Pembayaran', icon: 'payments' },
+    { path: '/export', label: 'Ekspor Data', icon: 'file_download' },
+  ]
+  
+  if (userRole.value === 'owner') {
+    items.push({ path: '/settings', label: 'Pengaturan Region', icon: 'settings' })
+  }
+  
+  return items
+})
 
 const pageTitle = computed(() => {
-  const allNav = [...navItems, { path: '/settings', label: 'Pengaturan' }]
-  const currentNav = allNav.find((item) => item.path === route.path)
+  const currentNav = navItems.value.find((item) => item.path === route.path)
   return currentNav?.label || 'Beranda'
 })
 
@@ -201,6 +272,57 @@ async function handleLogout() {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+/* Region Selector */
+.region-selector {
+  padding: 0 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.region-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.region-label .material-symbols-outlined {
+  font-size: 1rem;
+  color: var(--primary);
+}
+
+.region-select {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.region-select:hover {
+  border-color: var(--primary);
+}
+
+.region-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-bg);
+}
+
+.region-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .nav-item {

@@ -10,6 +10,21 @@ export interface Kost {
   created_at: string
 }
 
+export interface KostCreate {
+  name: string
+  address?: string
+  total_units: number
+  notes?: string
+  region_id: string
+}
+
+export interface KostUpdate {
+  name?: string
+  address?: string
+  total_units?: number
+  notes?: string
+}
+
 export interface KostListResponse {
   items: Kost[]
   total: number
@@ -29,6 +44,21 @@ export const kostService = {
     const response = await httpClient.get<Kost>(`/kosts/${id}`)
     return response.data
   },
+
+  async create(data: KostCreate): Promise<Kost> {
+    const response = await httpClient.post<Kost>('/kosts', data)
+    return response.data
+  },
+
+  async update(id: string, data: KostUpdate): Promise<Kost> {
+    const response = await httpClient.put<Kost>(`/kosts/${id}`, data)
+    return response.data
+  },
+
+  async delete(id: string): Promise<void> {
+    await httpClient.delete(`/kosts/${id}`)
+  },
 }
 
 export default kostService
+

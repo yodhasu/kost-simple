@@ -5,10 +5,12 @@ Tenants router - API endpoints.
 from uuid import UUID
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.core.auth import get_current_firebase_uid
+from app.features.users.service import UserProfileService
 from app.features.tenants.schemas import (
     TenantCreate,
     TenantUpdate,
@@ -21,18 +23,23 @@ from app.features.tenants.service import TenantsService
 router = APIRouter()
 
 
+from app.features.common.dependencies import get_current_user_region
+
+
 @router.get("", response_model=TenantListResponse)
 async def get_tenants(
     kost_id: Optional[UUID] = Query(None, description="Filter by kost ID"),
     search: Optional[str] = Query(None, description="Search by name or phone"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
+    region_id: Optional[UUID] = Depends(get_current_user_region),
     db: Session = Depends(get_db),
 ):
-    """Get paginated list of tenants."""
+    """Get paginated list of tenants, filtered by user's region."""
     service = TenantsService(db)
     items, total = service.get_all(
         kost_id=kost_id,
+        region_id=region_id,
         page=page, 
         page_size=page_size,
         search=search
