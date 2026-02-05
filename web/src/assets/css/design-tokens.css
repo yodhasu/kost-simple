@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Primary Colors */
+  --primary: #0f766d;
+  --primary-light: #14B8A6;
+  --primary-dark: #0F766E;
+  --primary-bg: rgba(15, 118, 109, 0.1);
+
+  /* Neutral Colors */
+  --bg-main: #f6f8f8;
+  --bg-card: #FFFFFF;
+  --bg-sidebar: #FFFFFF;
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-muted: #9CA3AF;
+
+  /* Status Colors */
+  --success: #16A34A;
+  --success-bg: #DCFCE7;
+  --success-text: #166534;
+  --warning: #F59E0B;
+  --warning-bg: #FEF3C7;
+  --warning-text: #92400E;
+  --danger: #DC2626;
+  --danger-bg: #FEE2E2;
+  --danger-text: #991B1B;
+  --info: #2563EB;
+  --info-bg: #DBEAFE;
+  --info-text: #1E40AF;
+
+  /* Additional Colors */
+  --blue-bg: #EFF6FF;
+  --blue-text: #2563EB;
+  --orange-bg: #FFF7ED;
+  --orange-text: #EA580C;
+  --purple-bg: #F3E8FF;
+  --purple-text: #7C3AED;
+  --red-bg: #FEF2F2;
+  --red-text: #DC2626;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+  /* Spacing */
+  --sidebar-width: 256px;
+  --header-height: 64px;
+
+  /* Border Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+}
