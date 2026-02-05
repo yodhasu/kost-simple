@@ -4,7 +4,7 @@ Dashboard service - Business logic for dashboard endpoints.
 
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from uuid import UUID
 
 from sqlalchemy import func, and_, extract
@@ -29,29 +29,36 @@ class DashboardService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_stats(self, kost_id: UUID = None) -> DashboardStats:
+    def _get_kost_ids_by_region(self, region_id: UUID) -> List[UUID]:
+        """Get all kost IDs for a given region."""
+        return [
+            id_tuple[0] for id_tuple in 
+            self.db.query(Kost.id).filter(Kost.region_id == region_id).all()
+        ]
+
+    def get_stats(self, kost_id: UUID = None, region_id: UUID = None) -> DashboardStats:
         """Get dashboard statistics."""
-        # Get total rooms from kost.total_units
+        # Base query filters
+        kost_filter = []
         if kost_id:
-            # Single kost
-            kost = self.db.query(Kost).filter(Kost.id == kost_id).first()
-            total_rooms = kost.total_units if kost else 0
+            kost_filter = [Kost.id == kost_id]
+        elif region_id:
+            kost_filter = [Kost.region_id == region_id]
             
-            # Count active tenants for this kost
-            total_tenants = self.db.query(func.count(Tenant.id)).filter(
-                Tenant.kost_id == kost_id,
-                Tenant.status == "aktif"
-            ).scalar() or 0
-        else:
-            # All kosts - sum total_units
-            total_rooms = self.db.query(
-                func.coalesce(func.sum(Kost.total_units), 0)
-            ).scalar() or 0
-            
-            # Count all active tenants
-            total_tenants = self.db.query(func.count(Tenant.id)).filter(
-                Tenant.status == "aktif"
-            ).scalar() or 0
+        # Get total rooms from kost.total_units
+        total_rooms_query = self.db.query(func.coalesce(func.sum(Kost.total_units), 0))
+        if kost_filter:
+            total_rooms_query = total_rooms_query.filter(*kost_filter)
+        total_rooms = total_rooms_query.scalar() or 0
+
+        # Count active tenants
+        # Join with Kost to filter by region if needed
+        active_tenants_query = self.db.query(func.count(Tenant.id)).join(Kost, Tenant.kost_id == Kost.id).filter(
+            Tenant.status == "aktif"
+        )
+        if kost_filter:
+            active_tenants_query = active_tenants_query.filter(*kost_filter)
+        total_tenants = active_tenants_query.scalar() or 0
 
         # Empty rooms = total_units - active tenants
         empty_rooms = max(0, total_rooms - total_tenants)
@@ -63,12 +70,12 @@ class DashboardService:
         last_month = date.today().replace(day=1) - timedelta(days=1)
         last_month_start = last_month.replace(day=1)
         
-        last_month_query = self.db.query(func.count(Tenant.id)).filter(
+        last_month_query = self.db.query(func.count(Tenant.id)).join(Kost, Tenant.kost_id == Kost.id).filter(
             Tenant.status == "aktif",
             Tenant.created_at < last_month_start
         )
-        if kost_id:
-            last_month_query = last_month_query.filter(Tenant.kost_id == kost_id)
+        if kost_filter:
+            last_month_query = last_month_query.filter(*kost_filter)
         last_month_count = last_month_query.scalar() or 0
 
         tenant_change = None
@@ -83,7 +90,7 @@ class DashboardService:
             tenant_change_percent=tenant_change
         )
 
-    def get_income_trend(self, kost_id: UUID = None, period: str = "month") -> IncomeTrendResponse:
+    def get_income_trend(self, kost_id: UUID = None, region_id: UUID = None, period: str = "month") -> IncomeTrendResponse:
         """Get income trend for a specific period (month, semester, year)."""
         today = date.today()
         items = []
@@ -121,11 +128,16 @@ class DashboardService:
             end_date = today.replace(month=12, day=31)
             period_label = f"Tahun {today.year}"
         
+        # Determine filters
+        kost_filter = []
+        if kost_id:
+            kost_filter = [Kost.id == kost_id]
+        elif region_id:
+            kost_filter = [Kost.region_id == region_id]
+
         # Generate weeks within the period
-        # Start from the first Monday of the period
         current = start_date
-        # Move to the first day of the week containing start_date
-        current = current - timedelta(days=current.weekday())
+        current = current - timedelta(days=current.weekday()) # Start of week (Monday)
         
         week_num = 1
         while current <= end_date:
@@ -133,23 +145,26 @@ class DashboardService:
             week_end = current + timedelta(days=6)
             
             # Clamp to period boundaries
-            if week_start < start_date:
-                week_start = start_date
-            if week_end > end_date:
-                week_end = end_date
+            query_start = max(week_start, start_date)
+            query_end = min(week_end, end_date)
             
-            # Query income for this week
-            query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
-                and_(
-                    Transaction.type == "income",
-                    Transaction.transaction_date >= week_start,
-                    Transaction.transaction_date <= week_end
+            if query_start <= query_end:
+                # Query income for this week
+                query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).join(Kost, Transaction.kost_id == Kost.id).filter(
+                    and_(
+                        Transaction.type == "income",
+                        Transaction.transaction_date >= query_start,
+                        Transaction.transaction_date <= query_end
+                    )
                 )
-            )
-            if kost_id:
-                query = query.filter(Transaction.kost_id == kost_id)
-            
-            amount = query.scalar() or Decimal("0")
+                
+                if kost_filter:
+                    query = query.filter(*kost_filter)
+                
+                amount = query.scalar() or Decimal("0")
+            else:
+                amount = Decimal("0")
+
             total += amount
             
             # Generate label
@@ -174,14 +189,17 @@ class DashboardService:
             total=total
         )
 
-    def get_tenant_tracker(self, kost_id: UUID = None, limit: int = 10) -> TenantTrackerResponse:
+    def get_tenant_tracker(self, kost_id: UUID = None, region_id: UUID = None, limit: int = 10) -> TenantTrackerResponse:
         """Get tenant payment status tracker."""
         today = date.today()
         
         # Get active tenants
-        query = self.db.query(Tenant).filter(Tenant.status == "aktif")
+        query = self.db.query(Tenant).join(Kost, Tenant.kost_id == Kost.id).filter(Tenant.status == "aktif")
+        
         if kost_id:
             query = query.filter(Tenant.kost_id == kost_id)
+        elif region_id:
+            query = query.filter(Kost.region_id == region_id)
         
         tenants = query.limit(limit).all()
         items = []

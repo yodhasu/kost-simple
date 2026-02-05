@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse, type AxiosError } from 'axios'
 import { config } from '../../../config'
+import { auth } from '../../../lib/firebase'
 
 const httpClient: AxiosInstance = axios.create({
   baseURL: config.api.baseUrl,
@@ -9,11 +10,12 @@ const httpClient: AxiosInstance = axios.create({
   },
 })
 
-// Request interceptor
+// Request interceptor - Add Firebase ID token
 httpClient.interceptors.request.use(
-  (requestConfig: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('auth_token')
-    if (token && requestConfig.headers) {
+  async (requestConfig: InternalAxiosRequestConfig) => {
+    const user = auth.currentUser
+    if (user && requestConfig.headers) {
+      const token = await user.getIdToken()
       requestConfig.headers.Authorization = `Bearer ${token}`
     }
     return requestConfig
@@ -28,7 +30,7 @@ httpClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token')
+      // Token expired or invalid, redirect to login
       window.location.href = '/login'
     }
     return Promise.reject(error)
@@ -36,3 +38,4 @@ httpClient.interceptors.response.use(
 )
 
 export default httpClient
+

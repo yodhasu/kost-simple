@@ -14,6 +14,7 @@ from app.features.tenants.schemas import (
     TenantUpdate,
     TenantResponse,
     TenantListResponse,
+    TenantDetailResponse,
 )
 from app.features.tenants.service import TenantsService
 
@@ -39,9 +40,9 @@ async def get_tenants(
     return TenantListResponse(items=items, total=total, page=page, page_size=page_size)
 
 
-@router.get("/{tenant_id}", response_model=TenantResponse)
+@router.get("/{tenant_id}", response_model=TenantDetailResponse)
 async def get_tenant(tenant_id: UUID, db: Session = Depends(get_db)):
-    """Get a single tenant by ID."""
+    """Get a single tenant by ID with details."""
     service = TenantsService(db)
     return service.get_by_id(tenant_id)
 

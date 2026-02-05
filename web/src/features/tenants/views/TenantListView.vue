@@ -51,7 +51,7 @@
         <tbody>
           <tr v-for="tenant in tenants" :key="tenant.id">
             <td>
-              <div class="tenant-cell">
+              <div class="tenant-cell" @click="openDetailModal(tenant)" style="cursor: pointer">
                 <div class="tenant-avatar" :style="{ backgroundColor: getAvatarColor(tenant.name) }">
                   {{ getInitials(tenant.name) }}
                 </div>
@@ -69,8 +69,10 @@
               </span>
             </td>
             <td class="action-cell">
-              <button class="action-btn action-edit" @click="openEditModal(tenant)">Edit</button>
-              <button class="action-btn action-delete" @click="confirmDelete(tenant)">Hapus</button>
+              <template v-if="tenant.status !== 'inactive'">
+                <button class="action-btn action-edit" @click="openEditModal(tenant)">Edit</button>
+                <button class="action-btn action-delete" @click="confirmDelete(tenant)">Hapus</button>
+              </template>
             </td>
           </tr>
           <tr v-if="tenants.length === 0">
@@ -121,6 +123,12 @@
       @saved="onTenantSaved"
     />
 
+    <TenantDetailModal
+      v-if="showDetailModal"
+      :tenant-id="selectedDetailId"
+      @close="closeDetailModal"
+    />
+
     <!-- Delete Confirmation -->
     <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="showDeleteConfirm = false">
       <div class="confirm-modal">
@@ -139,6 +147,7 @@
 import { ref, computed, onMounted } from 'vue'
 import tenantService, { type Tenant } from '../services/tenantService'
 import TenantFormModal from '../components/TenantFormModal.vue'
+import TenantDetailModal from '../components/TenantDetailModal.vue'
 
 // State
 const loading = ref(true)
@@ -152,6 +161,8 @@ const showModal = ref(false)
 const showDeleteConfirm = ref(false)
 const selectedTenant = ref<Tenant | null>(null)
 const tenantToDelete = ref<Tenant | null>(null)
+const showDetailModal = ref(false)
+const selectedDetailId = ref('')
 
 // TODO: Get from current user context/store
 const currentKostId = ref<string>('')
@@ -213,6 +224,16 @@ function goToPage(page: number) {
 function openAddModal() {
   selectedTenant.value = null
   showModal.value = true
+}
+
+function openDetailModal(tenant: Tenant) {
+  selectedDetailId.value = tenant.id
+  showDetailModal.value = true
+}
+
+function closeDetailModal() {
+  showDetailModal.value = false
+  selectedDetailId.value = ''
 }
 
 function openEditModal(tenant: Tenant) {

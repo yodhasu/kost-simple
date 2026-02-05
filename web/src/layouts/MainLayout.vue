@@ -5,16 +5,12 @@
       <!-- User Profile -->
       <div class="user-profile">
         <div class="avatar-wrapper">
-          <img
-            src="https://ui-avatars.com/api/?name=Budi+Santoso&background=0f766d&color=fff"
-            alt="User"
-            class="avatar"
-          />
+          <div class="avatar">{{ userInitials }}</div>
           <span class="status-dot"></span>
         </div>
         <div class="user-info">
-          <p class="user-name">Budi Santoso</p>
-          <p class="user-role">PEMILIK</p>
+          <p class="user-name">{{ userDisplayName }}</p>
+          <p class="user-role">{{ userRole }}</p>
         </div>
       </div>
 
@@ -41,7 +37,7 @@
 
       <!-- Logout -->
       <div class="sidebar-footer">
-        <button class="logout-btn">
+        <button class="logout-btn" @click="handleLogout">
           <span class="material-symbols-outlined">logout</span>
           Keluar
         </button>
@@ -73,9 +69,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuth } from '../shared/composables/useAuth'
 
 const route = useRoute()
+const router = useRouter()
+const { userDisplayName, userRole, signOut } = useAuth()
 
 const navItems = [
   { path: '/', label: 'Beranda', icon: 'dashboard' },
@@ -96,6 +95,22 @@ const currentDate = computed(() => {
   const now = new Date()
   return `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`
 })
+
+// Get user initials for avatar
+const userInitials = computed(() => {
+  const name = userDisplayName.value
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+})
+
+async function handleLogout() {
+  await signOut()
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -139,7 +154,13 @@ const currentDate = computed(() => {
   width: 40px;
   height: 40px;
   border-radius: var(--radius-full);
-  object-fit: cover;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
   box-shadow: 0 0 0 2px var(--primary), 0 0 0 4px white;
 }
 

@@ -3,11 +3,14 @@ Kosts router - API endpoints.
 """
 
 from uuid import UUID
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.core.auth import get_current_firebase_uid
+from app.features.users.service import UserProfileService
 from app.features.kosts.schemas import (
     KostCreate,
     KostUpdate,
@@ -19,15 +22,33 @@ from app.features.kosts.service import KostsService
 router = APIRouter()
 
 
+async def get_current_user_region(
+    firebase_uid: str = Depends(get_current_firebase_uid),
+    db: Session = Depends(get_db),
+) -> Optional[UUID]:
+    """Helper dependency to get current user's region ID."""
+    user_service = UserProfileService(db)
+    profile = user_service.get_by_firebase_uid(firebase_uid)
+    
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User profile not found."
+        )
+    
+    return profile.region_id
+
+
 @router.get("", response_model=KostListResponse)
 async def get_kosts(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
+    region_id: Optional[UUID] = Depends(get_current_user_region),
     db: Session = Depends(get_db),
 ):
-    """Get paginated list of kosts."""
+    """Get paginated list of kosts, filtered by user's region."""
     service = KostsService(db)
-    items, total = service.get_all(page=page, page_size=page_size)
+    items, total = service.get_all(page=page, page_size=page_size, region_id=region_id)
     return KostListResponse(items=items, total=total, page=page, page_size=page_size)
 
 

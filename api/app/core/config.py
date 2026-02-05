@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # CORS - supports JSON array string or comma-separated values
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
+    # Firebase
+    FIREBASE_PROJECT_ID: str = ""
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

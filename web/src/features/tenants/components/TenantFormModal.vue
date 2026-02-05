@@ -53,6 +53,21 @@
               </div>
 
               <div class="form-group">
+                <label class="form-label">Pilih Kost</label>
+                <select 
+                  v-model="form.kost_id" 
+                  class="form-input form-select"
+                  :disabled="loadingKosts || (!!props.kostId && !isEdit)"
+                  required
+                >
+                  <option value="" disabled>Pilih Kost</option>
+                  <option v-for="kost in kostOptions" :key="kost.id" :value="kost.id">
+                    {{ kost.name }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="form-group">
                 <label class="form-label">Tanggal Masuk</label>
                 <input 
                   v-model="form.start_date" 
@@ -101,10 +116,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import tenantService, { type Tenant, type TenantCreate, type TenantUpdate } from '../services/tenantService'
+import kostService, { type Kost } from '../../kosts/services/kostService'
 
 const props = defineProps<{
   tenant: Tenant | null
-  kostId: string
+  kostId?: string // Optional now, as user can select
 }>()
 
 const emit = defineEmits<{
@@ -114,8 +130,11 @@ const emit = defineEmits<{
 
 const isEdit = computed(() => !!props.tenant)
 const saving = ref(false)
+const kostOptions = ref<Kost[]>([])
+const loadingKosts = ref(false)
 
 const form = ref({
+  kost_id: '',
   name: '',
   phone: '',
   start_date: '',
@@ -123,19 +142,50 @@ const form = ref({
   status: 'aktif' as 'aktif' | 'dp',
 })
 
-onMounted(() => {
+onMounted(async () => {
+  // Load kost options
+  loadKosts()
+
   if (props.tenant) {
+    // Edit mode
     form.value = {
+      kost_id: props.tenant.kost_id,
       name: props.tenant.name,
       phone: props.tenant.phone || '',
       start_date: props.tenant.start_date || '',
       rent_price: props.tenant.rent_price || 0,
       status: props.tenant.status as 'aktif' | 'dp',
     }
+  } else if (props.kostId) {
+    // Create mode with pre-selected kost
+    form.value.kost_id = props.kostId
   }
 })
 
+async function loadKosts() {
+  loadingKosts.value = true
+  try {
+    // This endpoint is already filtered by region in backend based on user token
+    const response = await kostService.getAll(1, 100)
+    kostOptions.value = response.items
+    
+    // Auto-select if only one kost and no selection yet
+    if (!form.value.kost_id && response.items.length === 1) {
+      form.value.kost_id = response.items[0].id
+    }
+  } catch (e) {
+    console.error('Failed to load kosts', e)
+  } finally {
+    loadingKosts.value = false
+  }
+}
+
 async function handleSubmit() {
+  if (!form.value.kost_id) {
+    alert('Silakan pilih Kost terlebih dahulu')
+    return
+  }
+
   saving.value = true
   
   try {
@@ -152,7 +202,7 @@ async function handleSubmit() {
     } else {
       // Create
       const createData: TenantCreate = {
-        kost_id: props.kostId,
+        kost_id: form.value.kost_id,
         name: form.value.name,
         phone: form.value.phone || undefined,
         start_date: form.value.start_date || undefined,

@@ -19,15 +19,20 @@ class KostsService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, page: int = 1, page_size: int = 10) -> tuple[List[Kost], int]:
-        """Get paginated list of kosts."""
+    def get_all(self, page: int = 1, page_size: int = 10, region_id: Optional[UUID] = None) -> tuple[List[Kost], int]:
+        """Get paginated list of kosts, optionally filtered by region."""
+        query = self.db.query(Kost)
+        
+        if region_id:
+            query = query.filter(Kost.region_id == region_id)
+
         # Get total count
-        total = self.db.query(func.count(Kost.id)).scalar()
+        total = query.with_entities(func.count(Kost.id)).scalar()
         
         # Get paginated items
         offset = (page - 1) * page_size
         items = (
-            self.db.query(Kost)
+            query
             .order_by(Kost.created_at.desc())
             .offset(offset)
             .limit(page_size)

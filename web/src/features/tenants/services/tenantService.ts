@@ -36,6 +36,22 @@ export interface TenantListResponse {
   page_size: number
 }
 
+export interface Transaction {
+  id: string
+  kost_id: string
+  tenant_id: string | null
+  type: string
+  category: string | null
+  amount: number
+  transaction_date: string
+  description: string | null
+  created_at: string
+}
+
+export interface TenantDetail extends Tenant {
+  transactions: Transaction[]
+}
+
 export const tenantService = {
   async getAll(params: {
     kost_id?: string
@@ -47,7 +63,7 @@ export const tenantService = {
     return response.data
   },
 
-  async getById(id: string): Promise<Tenant> {
+  async getById(id: string): Promise<TenantDetail> {
     const response = await httpClient.get(`/tenants/${id}`)
     return response.data
   },

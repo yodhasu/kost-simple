@@ -2,7 +2,7 @@
 Tenants schemas (Pydantic models).
 """
 
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, date
 from decimal import Decimal
 from uuid import UUID
@@ -10,11 +10,17 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from app.features.transactions.schemas import TransactionResponse
+
 
 class TenantStatus(str, Enum):
     """Tenant status enum."""
     ACTIVE = "aktif"
     DP = "dp"
+    INACTIVE = "inactive"
+    MOVE = "pindah"
+    LATE = "telat"
+    RENOVATION = "renovasi"
 
 
 class TenantBase(BaseModel):
@@ -51,9 +57,6 @@ class TenantResponse(TenantBase):
         from_attributes = True
 
 
-class TenantListResponse(BaseModel):
-    """Schema for paginated tenant list."""
-    items: list[TenantResponse]
-    total: int
-    page: int
-    page_size: int
+class TenantDetailResponse(TenantResponse):
+    """Schema for detailed tenant response with relationships."""
+    transactions: List[TransactionResponse] = []
