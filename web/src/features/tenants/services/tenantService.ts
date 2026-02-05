@@ -8,7 +8,7 @@ export interface Tenant {
   start_date: string | null
   end_date: string | null
   rent_price: number | null
-  status: 'aktif' | 'dp' | 'inactive'
+  status: 'aktif' | 'dp' | 'inaktif' | 'pindah' | 'telat' | 'renovasi'
   created_at: string
 }
 

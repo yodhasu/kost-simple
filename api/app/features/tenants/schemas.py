@@ -17,7 +17,7 @@ class TenantStatus(str, Enum):
     """Tenant status enum."""
     ACTIVE = "aktif"
     DP = "dp"
-    INACTIVE = "inactive"
+    INACTIVE = "inaktif"
     MOVE = "pindah"
     LATE = "telat"
     RENOVATION = "renovasi"

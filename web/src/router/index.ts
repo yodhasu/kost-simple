@@ -6,6 +6,7 @@ import { useAuth } from '../shared/composables/useAuth'
 import dashboardRoutes from '../features/dashboard/routes'
 import tenantRoutes from '../features/tenants/routes'
 import authRoutes from '../features/auth/routes'
+import actionsRoutes from '../features/actions/routes'
 
 const routes: RouteRecordRaw[] = [
   // Auth routes (no layout)
@@ -19,6 +20,7 @@ const routes: RouteRecordRaw[] = [
     children: [
       ...dashboardRoutes,
       ...tenantRoutes,
+      ...actionsRoutes,
     ],
   },
 ]

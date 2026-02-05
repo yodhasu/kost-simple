@@ -69,7 +69,7 @@
               </span>
             </td>
             <td class="action-cell" @click.stop>
-              <template v-if="tenant.status !== 'inactive'">
+              <template v-if="tenant.status !== 'inaktif'">
                 <button class="action-btn action-edit" @click.stop="openEditModal(tenant)">Edit</button>
                 <button class="action-btn action-delete" @click.stop="confirmDelete(tenant)">Hapus</button>
               </template>

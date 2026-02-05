@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api.router import api_router
+from app.api.internal.cron import router as cron_router
 
 
 @asynccontextmanager
@@ -40,6 +41,9 @@ def create_application() -> FastAPI:
 
     # Routes: /api/{feature_name} (no v1)
     app.include_router(api_router, prefix="/api")
+
+    # Internal cron routes (not user-facing)
+    app.include_router(cron_router)
 
     return app
 

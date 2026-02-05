@@ -64,7 +64,7 @@
           >
             <div class="history-info">
               <span class="history-date">{{ formatDateMonthYear(tx.transaction_date) }}</span>
-              <span class="history-sub">Jatuh tempo: 05 {{ formatDateMonth(tx.transaction_date) }}</span>
+              <span class="history-sub">Jatuh tempo: {{ getDueDate(tx.transaction_date) }}</span>
             </div>
             <div class="history-status" :class="tx.type === 'income' ? 'status-paid' : 'status-unpaid'">
               {{ tx.type === 'income' ? 'Lunas' : 'Belum Bayar' }}
@@ -77,7 +77,7 @@
         <!-- Actions -->
         <div class="modal-actions">
           <a 
-            v-if="tenant.status !== 'inactive' && tenant.phone"
+            v-if="tenant.status !== 'inaktif' && tenant.phone"
             :href="getWhatsAppLink(tenant.phone)"
             target="_blank"
             class="btn-whatsapp"
@@ -86,14 +86,14 @@
             Beritahu via WhatsApp
           </a>
           <a 
-            v-else-if="tenant.status !== 'inactive' && !tenant.phone"
+            v-else-if="tenant.status !== 'inaktif' && !tenant.phone"
             class="btn-whatsapp-disabled"
             disabled
           >
             <span class="material-symbols-outlined">chat</span>
             Nomor WhatsApp Tidak Tersedia
           </a>
-          <div class="action-row" v-if="tenant.status !== 'inactive'">
+          <div class="action-row" v-if="tenant.status !== 'inaktif'">
             <button class="btn-outline">Tangguhkan</button>
             <button class="btn-outline text-red" @click="$emit('set-inactive')">Set Inaktif</button>
           </div>
@@ -146,7 +146,7 @@ function getStatusLabel(status: string): string {
   const map: Record<string, string> = { 
     aktif: 'Aktif', 
     dp: 'DP', 
-    inactive: 'Tidak Aktif' 
+    inaktif: 'Tidak Aktif' 
   }
   return map[status] || status
 }
@@ -163,6 +163,14 @@ function formatDateMonth(dateStr: string | null): string {
 
 function formatDateMonthYear(dateStr: string): string {
   return new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(new Date(dateStr))
+}
+
+function getDueDate(dateStr: string | null): string {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  date.setMonth(date.getMonth() + 1)
+  
+  return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
 function getWhatsAppLink(phone: string | null): string {
