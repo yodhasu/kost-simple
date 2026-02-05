@@ -14,6 +14,7 @@ from app.api.router import api_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+    print(f"🌍 Loaded CORS Origins: {settings.CORS_ORIGINS}")
     yield
     print(f"👋 Shutting down {settings.APP_NAME}")
 
