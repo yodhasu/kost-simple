@@ -12,5 +12,5 @@ jobs:
     steps:
       - name: Call backend cron endpoint
         run: |
-          curl -X POST https://ost-simple-production.up.railway.app/internal/cron/update-tenant-status \
+          curl -X POST https://kost-simple-production.up.railway.app/api/cron/update-tenant-status \
             -H "X-Cron-Key: ${{ secrets.CRON_SECRET }}"
