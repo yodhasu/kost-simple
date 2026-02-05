@@ -43,7 +43,7 @@ def create_application() -> FastAPI:
     app.include_router(api_router, prefix="/api")
 
     # Internal cron routes (not user-facing)
-    app.include_router(cron_router)
+    app.include_router(cron_router, prefix="/api/cron")
 
     return app
 

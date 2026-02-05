@@ -9,7 +9,7 @@ from sqlalchemy import text
 
 from app.db.session import get_db
 
-router = APIRouter(prefix="/internal/cron", tags=["cron"])
+router = APIRouter(tags=["cron"])
 
 
 @router.post("/update-tenant-status")

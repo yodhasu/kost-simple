@@ -1,0 +1,16 @@
+name: Update Tenant Status (Cron)
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # every day at 01:00 UTC
+  workflow_dispatch: # allow manual run
+
+jobs:
+  run-cron:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call backend cron endpoint
+        run: |
+          curl -X POST https://ost-simple-production.up.railway.app/internal/cron/update-tenant-status \
+            -H "X-Cron-Key: ${{ secrets.CRON_SECRET }}"
