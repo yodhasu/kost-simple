@@ -7,7 +7,7 @@ const routes: RouteRecordRaw[] = [
     name: 'settings',
     component: SettingsView,
     meta: {
-      title: 'Pengaturan Region',
+      title: 'Pengaturan',
       requiresAuth: true
     }
   }

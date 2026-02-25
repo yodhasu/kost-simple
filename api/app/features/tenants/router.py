@@ -17,6 +17,7 @@ from app.features.tenants.schemas import (
     TenantResponse,
     TenantListResponse,
     TenantDetailResponse,
+    TenantStatus,
 )
 from app.features.tenants.service import TenantsService
 
@@ -30,6 +31,7 @@ from app.features.common.dependencies import get_current_user_region
 async def get_tenants(
     kost_id: Optional[UUID] = Query(None, description="Filter by kost ID"),
     search: Optional[str] = Query(None, description="Search by name or phone"),
+    status: Optional[TenantStatus] = Query(None, description="Filter by tenant status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     region_id: Optional[UUID] = Depends(get_current_user_region),
@@ -42,7 +44,8 @@ async def get_tenants(
         region_id=region_id,
         page=page, 
         page_size=page_size,
-        search=search
+        search=search,
+        status=status.value if status else None,
     )
     return TenantListResponse(items=items, total=total, page=page, page_size=page_size)
 

@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, date
 from decimal import Decimal
 
-from sqlalchemy import Column, String, Date, DateTime, ForeignKey, Numeric, Text
+from sqlalchemy import Column, String, Date, DateTime, ForeignKey, BigInteger, Boolean, Text, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -24,8 +24,12 @@ class Tenant(Base):
     phone = Column(String, nullable=True)
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
-    rent_price = Column(Numeric(12, 2), nullable=True)
+    rent_price = Column(BigInteger, nullable=True)
+    trash_fee = Column(Integer, nullable=True)
+    security_fee = Column(Integer, nullable=True)
+    admin_fee = Column(Integer, nullable=True)
     status = Column(String, nullable=False, default="active")  # active, inactive, pending
+    is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
     # Relationships

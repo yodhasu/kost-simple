@@ -1,6 +1,5 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-container">
+  <BaseModal :visible="true" size="md" :show-close="false" @close="$emit('close')">
       <!-- Header -->
       <div class="modal-header">
         <div class="header-icon">
@@ -48,8 +47,17 @@
                 {{ tenant.name }} ({{ getStatusLabel(tenant.status) }})
               </option>
             </select>
+
+            <label class="checkbox-row">
+              <input
+                type="checkbox"
+                v-model="showAllTenants"
+                :disabled="!form.kost_id || loadingTenants"
+              />
+              <span>Tampilkan semua penyewa</span>
+            </label>
             <span v-if="form.kost_id && tenantOptions.length === 0 && !loadingTenants" class="form-hint">
-              Tidak ada penyewa dengan status DP atau Telat
+              {{ showAllTenants ? 'Tidak ada penyewa' : 'Tidak ada penyewa dengan status DP atau Telat' }}
             </span>
           </div>
 
@@ -58,7 +66,36 @@
             <span class="material-symbols-outlined info-icon">info</span>
             <div class="info-content">
               <strong>Status Pembayaran</strong>
-              <p>Tagihan bulan ini: <strong>{{ formatCurrency(selectedTenant.rent_price) }}</strong></p>
+              <div class="fee-breakdown">
+                <div class="fee-row">
+                  <span>Biaya Sewa</span>
+                  <span>{{ formatCurrency(selectedTenant.rent_price) }}</span>
+                </div>
+                <div v-if="selectedTenant.status !== 'dp'" class="fee-row">
+                  <span>Biaya Sampah</span>
+                  <span>{{ formatCurrency(selectedTenant.trash_fee) }}</span>
+                </div>
+                <div v-if="selectedTenant.status !== 'dp'" class="fee-row">
+                  <span>Biaya Keamanan</span>
+                  <span>{{ formatCurrency(selectedTenant.security_fee) }}</span>
+                </div>
+                <div v-if="selectedTenant.status !== 'dp'" class="fee-row">
+                  <span>Biaya Admin</span>
+                  <span>{{ formatCurrency(selectedTenant.admin_fee) }}</span>
+                </div>
+                <div v-if="selectedTenant.status === 'dp'" class="fee-row">
+                  <span>DP Dibayar</span>
+                  <span>-{{ formatCurrency(selectedTenant.dp_amount) }}</span>
+                </div>
+                <div v-if="selectedTenant.status === 'dp' && selectedTenant.dp_due_date" class="fee-row">
+                  <span>Batas Pelunasan</span>
+                  <span>{{ formatDate(selectedTenant.dp_due_date) }}</span>
+                </div>
+                <div class="fee-row fee-total">
+                  <span>Total Tagihan</span>
+                  <span>{{ formatCurrency(totalTagihan) }}</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -92,6 +129,7 @@
 
           <!-- Actions -->
           <div class="form-actions">
+            <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
             <button type="button" class="btn-cancel" @click="$emit('close')">Batal</button>
             <button type="submit" class="btn-submit" :disabled="saving">
               {{ saving ? 'Menyimpan...' : 'Simpan Pembayaran' }}
@@ -99,15 +137,16 @@
           </div>
         </form>
       </div>
-    </div>
-  </div>
+  </BaseModal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import kostService, { type Kost } from '../../kosts/services/kostService'
 import tenantService, { type Tenant } from '../../tenants/services/tenantService'
 import transactionService from '../services/transactionService'
+import { useToastStore } from '../../../shared/stores/toastStore'
 
 const emit = defineEmits<{
   close: []
@@ -117,9 +156,12 @@ const emit = defineEmits<{
 const loadingKosts = ref(false)
 const loadingTenants = ref(false)
 const saving = ref(false)
+const errorMessage = ref<string>('')
+const toast = useToastStore()
 
 const kostOptions = ref<Kost[]>([])
 const tenantOptions = ref<Tenant[]>([])
+const showAllTenants = ref(false)
 
 const form = ref({
   kost_id: '',
@@ -132,10 +174,25 @@ const selectedTenant = computed(() => {
   return tenantOptions.value.find(t => t.id === form.value.tenant_id) || null
 })
 
+const totalTagihan = computed(() => {
+  if (!selectedTenant.value) return 0
+  const rent = selectedTenant.value.rent_price || 0
+
+  if (selectedTenant.value.status === 'dp') {
+    const dpAmount = selectedTenant.value.dp_amount || 0
+    return Math.max(0, rent - dpAmount)
+  }
+
+  const trash = selectedTenant.value.trash_fee || 0
+  const security = selectedTenant.value.security_fee || 0
+  const admin = selectedTenant.value.admin_fee || 0
+  return rent + trash + security + admin
+})
+
 // Auto-fill amount when tenant selected
 watch(selectedTenant, (tenant) => {
-  if (tenant?.rent_price && form.value.amount === 0) {
-    form.value.amount = tenant.rent_price
+  if (tenant && form.value.amount === 0) {
+    form.value.amount = totalTagihan.value
   }
 })
 
@@ -167,6 +224,13 @@ function onKostChange() {
   loadTenants()
 }
 
+watch(showAllTenants, () => {
+  if (!form.value.kost_id) return
+  form.value.tenant_id = ''
+  form.value.amount = 0
+  loadTenants()
+})
+
 async function loadTenants() {
   if (!form.value.kost_id) return
 
@@ -176,10 +240,8 @@ async function loadTenants() {
       kost_id: form.value.kost_id,
       page_size: 100,
     })
-    // Filter to only show telat or dp status
-    tenantOptions.value = response.items.filter(t => 
-      t.status === 'telat' || t.status === 'dp'
-    )
+    const items = response.items.filter(t => t.is_active !== false)
+    tenantOptions.value = showAllTenants.value ? items : items.filter(t => t.status === 'telat' || t.status === 'dp')
   } catch (e) {
     console.error('Failed to load tenants', e)
   } finally {
@@ -206,8 +268,15 @@ function formatCurrency(amount: number | null): string {
   }).format(amount)
 }
 
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 async function handleSubmit() {
   saving.value = true
+  errorMessage.value = ''
   try {
     await transactionService.createPayment({
       kost_id: form.value.kost_id,
@@ -216,10 +285,12 @@ async function handleSubmit() {
       transaction_date: form.value.transaction_date,
     })
     
+    toast.push('success', 'Pembayaran berhasil disimpan.')
     emit('saved')
   } catch (error) {
     console.error('Failed to save payment:', error)
-    alert('Gagal menyimpan pembayaran')
+    errorMessage.value = 'Gagal menyimpan pembayaran.'
+    toast.push('error', errorMessage.value)
   } finally {
     saving.value = false
   }
@@ -342,6 +413,21 @@ async function handleSubmit() {
   color: #9CA3AF;
 }
 
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: #4B5563;
+  user-select: none;
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+}
+
 /* Form Row */
 .form-row {
   display: grid;
@@ -422,6 +508,30 @@ async function handleSubmit() {
   margin: 0;
 }
 
+/* Fee Breakdown */
+.fee-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.fee-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: #047857;
+}
+
+.fee-total {
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed #86EFAC;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #059669;
+}
+
 /* Form Actions */
 .form-actions {
   display: flex;
@@ -430,6 +540,13 @@ async function handleSubmit() {
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid #F3F4F6;
+  align-items: center;
+}
+
+.form-error {
+  margin-right: auto;
+  font-size: 0.8125rem;
+  color: #dc2626;
 }
 
 .btn-cancel {

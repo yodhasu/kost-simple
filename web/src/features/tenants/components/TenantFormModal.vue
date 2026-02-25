@@ -1,6 +1,5 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-container">
+  <BaseModal :visible="true" size="lg" :show-close="false" @close="$emit('close')">
       <!-- Header -->
       <div class="modal-header">
         <button class="back-btn" @click="$emit('close')">
@@ -16,15 +15,15 @@
       <div class="modal-body">
         <form @submit.prevent="handleSubmit">
           <div class="form-grid">
-            <!-- Left Column - Data Diri -->
-            <div class="form-section">
+            <!-- div1: Data Diri (top-left) -->
+            <div class="grid-div1">
               <div class="section-header">
                 <span class="material-symbols-outlined section-icon">person</span>
                 <h3 class="section-title">Data Diri</h3>
               </div>
 
               <div class="form-group">
-                <label class="form-label">Nama Lengkap</label>
+                <label class="form-label">Nama Lengkap <span class="required">*</span></label>
                 <input 
                   v-model="form.name" 
                   type="text" 
@@ -38,22 +37,90 @@
                 <label class="form-label">Nomor Handphone</label>
                 <input 
                   v-model="form.phone" 
-                  type="text" 
+                  type="tel" 
+                  inputmode="tel"
                   class="form-input"
                   placeholder="+62 812 3456 7890"
                 />
+                <p v-if="phoneError" class="form-error">{{ phoneError }}</p>
               </div>
             </div>
 
-            <!-- Right Column - Detail Sewa -->
-            <div class="form-section">
+            <!-- div3: Rincian Biaya (bottom-left) -->
+            <div class="grid-div3">
+              <div class="biaya-box">
+                <div class="section-header">
+                  <span class="material-symbols-outlined section-icon">payments</span>
+                  <h3 class="section-title">Rincian Biaya</h3>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Biaya Sewa (Per Bulan)</label>
+                  <div class="input-with-prefix">
+                    <span class="input-prefix">Rp</span>
+                    <input 
+                      v-model.number="form.rent_price" 
+                      type="number" 
+                      class="form-input"
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Biaya Sampah</label>
+                  <div class="input-with-prefix">
+                    <span class="input-prefix">Rp</span>
+                    <input 
+                      v-model.number="form.trash_fee" 
+                      type="number" 
+                      class="form-input"
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Biaya Keamanan</label>
+                  <div class="input-with-prefix">
+                    <span class="input-prefix">Rp</span>
+                    <input 
+                      v-model.number="form.security_fee" 
+                      type="number" 
+                      class="form-input"
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Biaya Admin</label>
+                  <div class="input-with-prefix">
+                    <span class="input-prefix">Rp</span>
+                    <input 
+                      v-model.number="form.admin_fee" 
+                      type="number" 
+                      class="form-input"
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- div2: Detail Sewa (right column) -->
+            <div class="grid-div2">
               <div class="section-header">
                 <span class="material-symbols-outlined section-icon">home</span>
                 <h3 class="section-title">Detail Sewa</h3>
               </div>
 
               <div class="form-group">
-                <label class="form-label">Pilih Kost</label>
+                <label class="form-label">Pilih Kost <span class="required">*</span></label>
                 <select 
                   v-model="form.kost_id" 
                   class="form-input form-select"
@@ -68,55 +135,70 @@
               </div>
 
               <div class="form-group">
-                <label class="form-label">Tanggal Masuk</label>
+                <label class="form-label">Tanggal Masuk <span class="required">*</span></label>
                 <input 
                   v-model="form.start_date" 
                   type="date" 
                   class="form-input"
+                  required
                 />
               </div>
 
               <div class="form-group">
-                <label class="form-label">Biaya Sewa (Per Bulan)</label>
+                <label class="form-label">Status <span class="required">*</span></label>
+                <select v-model="form.status" class="form-input form-select">
+                  <option value="aktif">Aktif</option>
+                  <option value="dp">DP</option>
+                </select>
+              </div>
+
+              <div v-if="form.status === 'dp'" class="form-group">
+                <label class="form-label">Nominal DP</label>
                 <div class="input-with-prefix">
                   <span class="input-prefix">Rp</span>
-                  <input 
-                    v-model.number="form.rent_price" 
-                    type="number" 
+                  <input
+                    v-model.number="form.dp_amount"
+                    type="number"
                     class="form-input"
                     placeholder="0"
                     min="0"
+                    required
                   />
                 </div>
               </div>
 
-              <div class="form-group">
-                <label class="form-label">Status</label>
-                <select v-model="form.status" class="form-input form-select">
-                  <option value="aktif">Active</option>
-                  <option value="dp">DP</option>
-                </select>
+              <div v-if="form.status === 'dp'" class="form-group">
+                <label class="form-label">Batas Pelunasan</label>
+                <input
+                  v-model="form.dp_due_date"
+                  type="date"
+                  class="form-input"
+                  required
+                />
               </div>
             </div>
-          </div>
 
-          <!-- Submit Button -->
-          <div class="form-actions">
-            <button type="submit" class="btn-submit" :disabled="saving">
-              <span class="material-symbols-outlined">save</span>
-              {{ saving ? 'Menyimpan...' : 'Simpan Data Penyewa' }}
-            </button>
+            <!-- div4: Actions (bottom-right) -->
+            <div class="grid-div4"> 
+              <p v-if="errorMessage" class="form-error form-error-global">{{ errorMessage }}</p>
+              <button type="button" class="btn-action-cancel" @click="$emit('close')">Batal</button>
+              <button type="submit" class="btn-submit" :disabled="saving">
+                <span class="material-symbols-outlined">save</span>
+                {{ saving ? 'Menyimpan...' : 'Simpan' }}
+              </button>
+            </div>
           </div>
         </form>
       </div>
-    </div>
-  </div>
+  </BaseModal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import tenantService, { type Tenant, type TenantCreate, type TenantUpdate } from '../services/tenantService'
 import kostService, { type Kost } from '../../kosts/services/kostService'
+import { useToastStore } from '../../../shared/stores/toastStore'
 
 const props = defineProps<{
   tenant: Tenant | null
@@ -130,6 +212,8 @@ const emit = defineEmits<{
 
 const isEdit = computed(() => !!props.tenant)
 const saving = ref(false)
+const errorMessage = ref<string>('')
+const toast = useToastStore()
 const kostOptions = ref<Kost[]>([])
 const loadingKosts = ref(false)
 
@@ -139,7 +223,25 @@ const form = ref({
   phone: '',
   start_date: '',
   rent_price: 0,
+  trash_fee: 0,
+  security_fee: 0,
+  admin_fee: 0,
   status: 'aktif' as 'aktif' | 'dp',
+  dp_amount: 0,
+  dp_due_date: '',
+})
+
+function getPhoneDigits(v: string): string {
+  return v.replace(/\D/g, '')
+}
+
+const phoneError = computed(() => {
+  const raw = (form.value.phone || '').trim()
+  if (!raw) return ''
+  if (!/^\+?[\d\s().-]+$/.test(raw)) return 'Nomor HP hanya boleh berisi angka.'
+  const digits = getPhoneDigits(raw)
+  if (digits.length < 10 || digits.length > 15) return 'Nomor HP harus 10-15 digit.'
+  return ''
 })
 
 onMounted(async () => {
@@ -154,7 +256,12 @@ onMounted(async () => {
       phone: props.tenant.phone || '',
       start_date: props.tenant.start_date || '',
       rent_price: props.tenant.rent_price || 0,
+      trash_fee: props.tenant.trash_fee || 0,
+      security_fee: props.tenant.security_fee || 0,
+      admin_fee: props.tenant.admin_fee || 0,
       status: props.tenant.status as 'aktif' | 'dp',
+      dp_amount: props.tenant.dp_amount || 0,
+      dp_due_date: props.tenant.dp_due_date || '',
     }
   } else if (props.kostId) {
     // Create mode with pre-selected kost
@@ -182,14 +289,38 @@ async function loadKosts() {
 }
 
 async function handleSubmit() {
+  errorMessage.value = ''
   if (!form.value.kost_id) {
-    alert('Silakan pilih Kost terlebih dahulu')
+    errorMessage.value = 'Silakan pilih Kost terlebih dahulu.'
+    toast.push('error', errorMessage.value)
     return
+  }
+  if (phoneError.value) {
+    errorMessage.value = phoneError.value
+    toast.push('error', errorMessage.value)
+    return
+  }
+  if (form.value.status === 'dp') {
+    if (!form.value.dp_amount || form.value.dp_amount <= 0) {
+      errorMessage.value = 'Nominal DP wajib diisi untuk status DP.'
+      toast.push('error', errorMessage.value)
+      return
+    }
+    if (!form.value.dp_due_date) {
+      errorMessage.value = 'Batas pelunasan wajib diisi untuk status DP.'
+      toast.push('error', errorMessage.value)
+      return
+    }
   }
 
   saving.value = true
   
   try {
+    const normalizedPhone = (form.value.phone || '').trim()
+    if (normalizedPhone) {
+      form.value.phone = normalizedPhone
+    }
+
     if (isEdit.value && props.tenant) {
       // Update
       const updateData: TenantUpdate = {
@@ -197,9 +328,15 @@ async function handleSubmit() {
         phone: form.value.phone || undefined,
         start_date: form.value.start_date || undefined,
         rent_price: form.value.rent_price || undefined,
+        trash_fee: form.value.trash_fee || undefined,
+        security_fee: form.value.security_fee || undefined,
+        admin_fee: form.value.admin_fee || undefined,
+        dp_amount: form.value.status === 'dp' ? form.value.dp_amount : undefined,
+        dp_due_date: form.value.status === 'dp' ? form.value.dp_due_date : undefined,
         status: form.value.status,
       }
       await tenantService.update(props.tenant.id, updateData)
+      toast.push('success', 'Penyewa berhasil diperbarui.')
     } else {
       // Create
       const createData: TenantCreate = {
@@ -208,15 +345,22 @@ async function handleSubmit() {
         phone: form.value.phone || undefined,
         start_date: form.value.start_date || undefined,
         rent_price: form.value.rent_price || undefined,
+        trash_fee: form.value.trash_fee || undefined,
+        security_fee: form.value.security_fee || undefined,
+        admin_fee: form.value.admin_fee || undefined,
+        dp_amount: form.value.status === 'dp' ? form.value.dp_amount : undefined,
+        dp_due_date: form.value.status === 'dp' ? form.value.dp_due_date : undefined,
         status: form.value.status,
       }
       await tenantService.create(createData)
+      toast.push('success', 'Penyewa berhasil ditambahkan.')
     }
     
     emit('saved')
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to save tenant:', error)
-    alert('Gagal menyimpan data penyewa')
+    errorMessage.value = error?.response?.data?.detail || 'Gagal menyimpan data penyewa.'
+    toast.push('error', errorMessage.value)
   } finally {
     saving.value = false
   }
@@ -298,23 +442,50 @@ async function handleSubmit() {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto auto auto auto auto;
+  grid-column-gap: 1.5rem;
+  grid-row-gap: 0;
+}
+
+.grid-div1 { 
+  grid-area: 1 / 1 / 3 / 3;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.grid-div3 { 
+  grid-area: 3 / 1 / 6 / 3;
+}
+
+.grid-div2 { 
+  grid-area: 1 / 3 / 5 / 5;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.grid-div4 { 
+  grid-area: 5 / 3 / 6 / 5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 1rem;
 }
 
 @media (max-width: 640px) {
   .form-grid {
     grid-template-columns: 1fr;
   }
+  .grid-div1 { grid-area: auto; }
+  .grid-div3 { grid-area: auto; }
+  .grid-div2 { grid-area: auto; }
+  .grid-div4 { grid-area: auto; }
 }
 
 /* Form Section */
-.form-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
 .section-header {
   display: flex;
   align-items: center;
@@ -333,6 +504,26 @@ async function handleSubmit() {
   color: var(--text-primary);
 }
 
+/* Biaya Box */
+.biaya-box {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: var(--radius-sm);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.biaya-box .section-header {
+  margin-bottom: 0;
+}
+
+.biaya-box .input-with-prefix {
+  background: white;
+}
+
 /* Form Group */
 .form-group {
   display: flex;
@@ -344,6 +535,21 @@ async function handleSubmit() {
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-secondary);
+}
+
+.required {
+  color: #ef4444;
+}
+
+.form-error {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: #dc2626;
+}
+
+.form-error-global {
+  justify-self: stretch;
+  margin: 0 0 0.25rem;
 }
 
 .form-input {
@@ -403,11 +609,22 @@ async function handleSubmit() {
   border: none;
 }
 
-/* Form Actions */
-.form-actions {
-  margin-top: 2rem;
-  display: flex;
-  justify-content: flex-end;
+/* Buttons */
+.btn-action-cancel {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action-cancel:hover {
+  background: var(--border-light);
+  color: var(--text-primary);
 }
 
 .btn-submit {

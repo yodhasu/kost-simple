@@ -17,7 +17,7 @@ class Kost(Base):
     __tablename__ = "kosts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    region_id = Column(UUID(as_uuid=True), nullable=False)
+    region_id = Column(UUID(as_uuid=True), ForeignKey("regions.id"), nullable=False)
     name = Column(String, nullable=False)
     address = Column(Text, nullable=True)
     total_units = Column(Integer, nullable=False, default=0)

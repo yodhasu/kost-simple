@@ -45,6 +45,8 @@ class Settings(BaseSettings):
 
     # Firebase
     FIREBASE_PROJECT_ID: str = ""
+    FIREBASE_SERVICE_ACCOUNT: str = ""
+    FIREBASE_SERVICE_ACCOUNT_PATH: str = ""
 
     # Cron Authentication
     CRON_SECRET: str = ""

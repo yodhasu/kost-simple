@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import List, Tuple, Optional
 from uuid import UUID
 
-from sqlalchemy import func, and_, extract
+from sqlalchemy import func, and_, cast, String
 from sqlalchemy.orm import Session
 
 from app.features.kosts.model import Kost
@@ -54,7 +54,8 @@ class DashboardService:
         # Count active tenants
         # Join with Kost to filter by region if needed
         active_tenants_query = self.db.query(func.count(Tenant.id)).join(Kost, Tenant.kost_id == Kost.id).filter(
-            Tenant.status == "aktif"
+            Tenant.status == "aktif",
+            Tenant.is_active == True
         )
         if kost_filter:
             active_tenants_query = active_tenants_query.filter(*kost_filter)
@@ -72,6 +73,7 @@ class DashboardService:
         
         last_month_query = self.db.query(func.count(Tenant.id)).join(Kost, Tenant.kost_id == Kost.id).filter(
             Tenant.status == "aktif",
+            Tenant.is_active == True,
             Tenant.created_at < last_month_start
         )
         if kost_filter:
@@ -152,7 +154,7 @@ class DashboardService:
                 # Query income for this week
                 query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).join(Kost, Transaction.kost_id == Kost.id).filter(
                     and_(
-                        Transaction.type == "income",
+                        cast(Transaction.type, String) == "income",
                         Transaction.transaction_date >= query_start,
                         Transaction.transaction_date <= query_end
                     )
@@ -194,7 +196,10 @@ class DashboardService:
         today = date.today()
         
         # Get active tenants
-        query = self.db.query(Tenant).join(Kost, Tenant.kost_id == Kost.id).filter(Tenant.status == "aktif")
+        query = self.db.query(Tenant).join(Kost, Tenant.kost_id == Kost.id).filter(
+            Tenant.status == "aktif",
+            Tenant.is_active == True
+        )
         
         if kost_id:
             query = query.filter(Tenant.kost_id == kost_id)
@@ -210,7 +215,7 @@ class DashboardService:
             last_payment = self.db.query(Transaction).filter(
                 and_(
                     Transaction.tenant_id == tenant.id,
-                    Transaction.type == "income",
+                    cast(Transaction.type, String) == "income",
                     Transaction.category == "rent"
                 )
             ).order_by(Transaction.transaction_date.desc()).first()

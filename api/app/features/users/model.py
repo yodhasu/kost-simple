@@ -5,13 +5,13 @@ User Profile model - SQLAlchemy ORM model.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, String, DateTime, ForeignKey
+from sqlalchemy import Column, String, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 
 
 class UserProfile(Base):
-    """User profile database model - links Firebase UID to role and region."""
+    """User profile database model - links Firebase UID to role."""
     
     __tablename__ = "user_profiles"
 
@@ -19,5 +19,5 @@ class UserProfile(Base):
     firebase_uid = Column(String, unique=True, nullable=False, index=True)
     name = Column(String, nullable=False)
     role = Column(String, nullable=False, default="admin")
-    region_id = Column(UUID(as_uuid=True), ForeignKey("regions.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+

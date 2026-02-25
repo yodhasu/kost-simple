@@ -34,7 +34,7 @@
         <div class="icon-wrapper bg-indigo">
           <span class="material-symbols-outlined">edit_square</span>
         </div>
-        <span class="action-label">Edit Kost</span>
+        <span class="action-label">{{ userRole === 'owner' ? 'Edit & Delete Kost' : 'Edit Kost' }}</span>
       </div>
 
       <div class="action-card" @click="handleExportData">
@@ -70,51 +70,53 @@
       :kost="selectedKost"
       @close="closeKostModal"
       @saved="onKostSaved"
+      @deleted="onKostDeleted"
     />
 
     <!-- Kost Select Modal for Edit -->
-    <div v-if="showKostSelectModal" class="modal-overlay" @click.self="showKostSelectModal = false">
-      <div class="select-modal">
-        <div class="select-header">
-          <h3>Pilih Kost untuk Diedit</h3>
-          <button class="close-btn" @click="showKostSelectModal = false">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        <div class="select-body">
-          <div v-if="loadingKosts" class="loading">Memuat...</div>
-          <div v-else-if="kostList.length === 0" class="empty">Tidak ada kost tersedia</div>
-          <div v-else class="kost-list">
-            <div 
-              v-for="kost in kostList" 
-              :key="kost.id" 
-              class="kost-item"
-              @click="selectKostForEdit(kost)"
-            >
-              <span class="material-symbols-outlined">home</span>
-              <div class="kost-info">
-                <span class="kost-name">{{ kost.name }}</span>
-                <span class="kost-address">{{ kost.address || 'Alamat belum diisi' }}</span>
-              </div>
-              <span class="material-symbols-outlined">chevron_right</span>
+    <BaseModal v-if="showKostSelectModal" :visible="true" size="sm" :show-close="false" @close="showKostSelectModal = false">
+      <div class="select-header">
+        <h3>Pilih Kost untuk Diedit</h3>
+        <button class="close-btn" @click="showKostSelectModal = false">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="select-body">
+        <div v-if="loadingKosts" class="loading">Memuat...</div>
+        <div v-else-if="kostList.length === 0" class="empty">Tidak ada kost tersedia</div>
+        <div v-else class="kost-list">
+          <div 
+            v-for="kost in kostList" 
+            :key="kost.id" 
+            class="kost-item"
+            @click="selectKostForEdit(kost)"
+          >
+            <span class="material-symbols-outlined">home</span>
+            <div class="kost-info">
+              <span class="kost-name">{{ kost.name }}</span>
+              <span class="kost-address">{{ kost.address || 'Alamat belum diisi' }}</span>
             </div>
+            <span class="material-symbols-outlined">chevron_right</span>
           </div>
         </div>
       </div>
-    </div>
+    </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '../../../shared/composables/useAuth'
 import TenantFormModal from '../../tenants/components/TenantFormModal.vue'
 import UpdatePaymentModal from '../components/UpdatePaymentModal.vue'
 import AddExpenseModal from '../components/AddExpenseModal.vue'
 import KostFormModal from '../../kosts/components/KostFormModal.vue'
 import kostService, { type Kost } from '../../kosts/services/kostService'
+import BaseModal from '../../../shared/components/base/BaseModal.vue'
 
 const router = useRouter()
+const { userRole } = useAuth()
 const showAddModal = ref(false)
 const showPaymentModal = ref(false)
 const showExpenseModal = ref(false)
@@ -191,6 +193,10 @@ function closeKostModal() {
 }
 
 function onKostSaved() {
+  closeKostModal()
+}
+
+function onKostDeleted() {
   closeKostModal()
 }
 
@@ -292,21 +298,11 @@ function handleExportData() {
   padding: 1rem;
 }
 
-.select-modal {
-  background: white;
-  border-radius: var(--radius-xl, 16px);
-  width: 100%;
-  max-width: 400px;
-  max-height: 80vh;
-  overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-}
-
 .select-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.5rem;
+  padding: 0.25rem 0 1rem;
   border-bottom: 1px solid var(--border-light, #e5e7eb);
 }
 
@@ -332,8 +328,8 @@ function handleExportData() {
 }
 
 .select-body {
-  padding: 1rem;
-  max-height: 60vh;
+  padding: 1rem 0 0;
+  max-height: 55vh;
   overflow-y: auto;
 }
 

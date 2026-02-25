@@ -8,7 +8,13 @@ export interface Tenant {
   start_date: string | null
   end_date: string | null
   rent_price: number | null
+  trash_fee: number | null
+  security_fee: number | null
+  admin_fee: number | null
+  dp_amount: number | null
+  dp_due_date: string | null
   status: 'aktif' | 'dp' | 'inaktif' | 'pindah' | 'telat' | 'renovasi'
+  is_active: boolean
   created_at: string
 }
 
@@ -18,6 +24,11 @@ export interface TenantCreate {
   phone?: string
   start_date?: string
   rent_price?: number
+  trash_fee?: number
+  security_fee?: number
+  admin_fee?: number
+  dp_amount?: number
+  dp_due_date?: string
   status?: 'aktif' | 'dp'
 }
 
@@ -26,7 +37,12 @@ export interface TenantUpdate {
   phone?: string
   start_date?: string
   rent_price?: number
-  status?: 'aktif' | 'dp'
+  trash_fee?: number
+  security_fee?: number
+  admin_fee?: number
+  dp_amount?: number
+  dp_due_date?: string
+  status?: 'aktif' | 'dp' | 'inaktif' | 'pindah' | 'telat' | 'renovasi'
 }
 
 export interface TenantListResponse {
@@ -56,6 +72,7 @@ export const tenantService = {
   async getAll(params: {
     kost_id?: string
     search?: string
+    status?: Tenant['status']
     page?: number
     page_size?: number
   } = {}): Promise<TenantListResponse> {

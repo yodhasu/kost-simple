@@ -1,6 +1,5 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-container">
+  <BaseModal :visible="true" size="md" :show-close="false" @close="$emit('close')">
       <!-- Header -->
       <div class="modal-header">
         <div class="header-content">
@@ -15,8 +14,40 @@
       <!-- Form Content -->
       <div class="modal-body">
         <form @submit.prevent="handleSubmit">
-          <!-- Select Kost -->
+          <!-- Pilih Tingkat -->
           <div class="form-group">
+            <label class="form-label">Pilih Tingkat <span class="required">*</span></label>
+            <select 
+              v-model="form.tingkat" 
+              class="form-input form-select"
+              required
+              @change="onTingkatChange"
+            >
+              <option value="" disabled>Pilih tingkat</option>
+              <option value="region">Region</option>
+              <option value="kost">Kost</option>
+            </select>
+          </div>
+
+          <!-- Select Region (shown when tingkat is selected) -->
+          <div v-if="form.tingkat" class="form-group">
+            <label class="form-label">Pilih Region <span class="required">*</span></label>
+            <select 
+              v-model="form.region_id" 
+              class="form-input form-select"
+              :disabled="loadingRegions"
+              required
+              @change="onRegionChange"
+            >
+              <option value="" disabled>Pilih Region</option>
+              <option v-for="region in regionOptions" :key="region.id" :value="region.id">
+                {{ region.name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Select Kost (shown only when tingkat is 'kost' and region selected) -->
+          <div v-if="form.tingkat === 'kost' && form.region_id" class="form-group">
             <label class="form-label">Pilih Kost <span class="required">*</span></label>
             <select 
               v-model="form.kost_id" 
@@ -25,10 +56,13 @@
               required
             >
               <option value="" disabled>Pilih Kost</option>
-              <option v-for="kost in kostOptions" :key="kost.id" :value="kost.id">
+              <option v-for="kost in filteredKosts" :key="kost.id" :value="kost.id">
                 {{ kost.name }}
               </option>
             </select>
+            <span v-if="form.region_id && filteredKosts.length === 0 && !loadingKosts" class="form-hint">
+              Tidak ada kost di region ini
+            </span>
           </div>
 
           <!-- Tipe Pengeluaran -->
@@ -99,6 +133,7 @@
 
           <!-- Actions -->
           <div class="form-actions">
+            <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
             <button type="button" class="btn-cancel" @click="$emit('close')">Batal</button>
             <button type="submit" class="btn-submit" :disabled="saving">
               <span class="material-symbols-outlined">save</span>
@@ -107,14 +142,16 @@
           </div>
         </form>
       </div>
-    </div>
-  </div>
+  </BaseModal>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import kostService, { type Kost } from '../../kosts/services/kostService'
+import regionService, { type Region } from '../../regions/services/regionService'
 import transactionService from '../services/transactionService'
+import { useToastStore } from '../../../shared/stores/toastStore'
 
 const emit = defineEmits<{
   close: []
@@ -122,10 +159,16 @@ const emit = defineEmits<{
 }>()
 
 const saving = ref(false)
+const errorMessage = ref<string>('')
+const toast = useToastStore()
 const loadingKosts = ref(false)
+const loadingRegions = ref(false)
 const kostOptions = ref<Kost[]>([])
+const regionOptions = ref<Region[]>([])
 
 const form = ref({
+  tingkat: '' as '' | 'region' | 'kost',
+  region_id: '',
   kost_id: '',
   category: '',
   description: '',
@@ -133,20 +176,33 @@ const form = ref({
   transaction_date: new Date().toISOString().split('T')[0] as string,
 })
 
+const filteredKosts = computed(() => {
+  if (!form.value.region_id) return []
+  return kostOptions.value.filter(k => k.region_id === form.value.region_id)
+})
+
 onMounted(async () => {
+  loadRegions()
   loadKosts()
 })
+
+async function loadRegions() {
+  loadingRegions.value = true
+  try {
+    const response = await regionService.getAll(1, 100)
+    regionOptions.value = response.items
+  } catch (e) {
+    console.error('Failed to load regions', e)
+  } finally {
+    loadingRegions.value = false
+  }
+}
 
 async function loadKosts() {
   loadingKosts.value = true
   try {
     const response = await kostService.getAll(1, 100)
     kostOptions.value = response.items
-
-    // Auto-select if only one kost
-    if (response.items.length === 1 && response.items[0]) {
-      form.value.kost_id = response.items[0].id
-    }
   } catch (e) {
     console.error('Failed to load kosts', e)
   } finally {
@@ -154,21 +210,40 @@ async function loadKosts() {
   }
 }
 
+function onTingkatChange() {
+  form.value.region_id = ''
+  form.value.kost_id = ''
+}
+
+function onRegionChange() {
+  form.value.kost_id = ''
+}
+
 async function handleSubmit() {
   saving.value = true
+  errorMessage.value = ''
   try {
-    await transactionService.createExpense({
-      kost_id: form.value.kost_id,
+    const payload: Record<string, any> = {
       category: form.value.category,
       amount: form.value.amount,
       transaction_date: form.value.transaction_date,
       description: form.value.description || undefined,
-    })
+    }
+
+    if (form.value.tingkat === 'kost') {
+      payload.kost_id = form.value.kost_id
+    } else {
+      payload.region_id = form.value.region_id
+    }
+
+    await transactionService.createExpense(payload as any)
     
+    toast.push('success', 'Pengeluaran berhasil disimpan.')
     emit('saved')
   } catch (error) {
     console.error('Failed to save expense:', error)
-    alert('Gagal menyimpan pengeluaran')
+    errorMessage.value = 'Gagal menyimpan pengeluaran.'
+    toast.push('error', errorMessage.value)
   } finally {
     saving.value = false
   }
@@ -300,12 +375,20 @@ async function handleSubmit() {
 
 .select-wrapper .form-select {
   padding-left: 2.75rem;
+  padding-right: 2.5rem;
   cursor: pointer;
   appearance: none;
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-  background-position: right 0.75rem center;
   background-repeat: no-repeat;
+  background-position: right 0.75rem center;
   background-size: 1.25rem 1.25rem;
+}
+
+.form-hint {
+  font-size: 0.75rem;
+  color: #EF4444;
+  margin-top: 0.25rem;
+  display: block;
 }
 
 /* Textarea */
@@ -495,6 +578,13 @@ async function handleSubmit() {
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1.5rem;
+  align-items: center;
+}
+
+.form-error {
+  margin-right: auto;
+  font-size: 0.8125rem;
+  color: #dc2626;
 }
 
 .btn-cancel {

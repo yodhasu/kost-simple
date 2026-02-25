@@ -39,6 +39,7 @@
               class="form-input"
               placeholder="dd/mm/yyyy"
             />
+            <p v-if="dateRangeError" class="form-error">{{ dateRangeError }}</p>
           </div>
 
           <div class="info-note">
@@ -80,6 +81,7 @@
             <span class="material-symbols-outlined">download</span>
             Unduh Data (Excel/CSV)
           </button>
+          <p v-if="errorMessage" class="form-error form-error-global">{{ errorMessage }}</p>
         </div>
       </div>
     </div>
@@ -89,6 +91,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import httpClient from '../../../shared/utils/api/httpClient'
+import { useToastStore } from '../../../shared/stores/toastStore'
 
 const form = ref({
   start_date: '',
@@ -97,13 +100,31 @@ const form = ref({
 })
 
 const exporting = ref(false)
+const errorMessage = ref<string>('')
+const toast = useToastStore()
+
+const dateRangeError = computed(() => {
+  if (!form.value.start_date || !form.value.end_date) return ''
+  const start = new Date(form.value.start_date).getTime()
+  const end = new Date(form.value.end_date).getTime()
+  if (Number.isNaN(start) || Number.isNaN(end)) return ''
+  if (end < start) return 'Tanggal selesai harus setelah tanggal mulai.'
+  return ''
+})
 
 const canExport = computed(() => {
-  return form.value.start_date && form.value.end_date && form.value.data_types.length > 0 && !exporting.value
+  return (
+    form.value.start_date &&
+    form.value.end_date &&
+    form.value.data_types.length > 0 &&
+    !dateRangeError.value &&
+    !exporting.value
+  )
 })
 
 async function handleExport() {
   exporting.value = true
+  errorMessage.value = ''
   
   try {
     // Build query params
@@ -140,10 +161,12 @@ async function handleExport() {
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
+    toast.push('success', 'File berhasil diunduh.')
     
   } catch (error) {
     console.error('Export failed:', error)
-    alert('Gagal mengunduh data. Silakan coba lagi.')
+    errorMessage.value = 'Gagal mengunduh data. Silakan coba lagi.'
+    toast.push('error', errorMessage.value)
   } finally {
     exporting.value = false
   }
@@ -260,6 +283,16 @@ async function handleExport() {
 .form-input:focus {
   outline: none;
   border-color: var(--primary, #0f766d);
+}
+
+.form-error {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: #dc2626;
+}
+
+.form-error-global {
+  margin: 0.75rem 0 0;
 }
 
 .info-note {

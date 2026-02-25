@@ -24,9 +24,26 @@
         <input 
           v-model="searchQuery" 
           type="text" 
-          placeholder="Cari nama, ID, atau unit..."
+          placeholder="Cari nama atau nomor HP..."
           @input="debouncedSearch"
         />
+      </div>
+    </div>
+
+    <div v-if="showFilters" class="filters-panel card">
+      <div class="filters-row">
+        <div class="filter-item">
+          <label>Status</label>
+          <select v-model="statusFilter" @change="applyFilters">
+            <option value="">Semua</option>
+            <option value="aktif">Aktif</option>
+            <option value="dp">DP</option>
+            <option value="telat">Telat</option>
+            <option value="renovasi">Renovasi</option>
+            <option value="pindah">Pindahan/Kosong</option>
+            <option value="inaktif">Tidak Aktif</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -43,7 +60,7 @@
             <th>NAMA PENYEWA</th>
             <th>NOMOR HP</th>
             <th>TANGGAL MASUK</th>
-            <th>BIAYA SEWA</th>
+            <th>TOTAL BIAYA</th>
             <th>STATUS</th>
             <th>AKSI</th>
           </tr>
@@ -62,7 +79,7 @@
             </td>
             <td>{{ tenant.phone || '-' }}</td>
             <td>{{ formatDate(tenant.start_date) }}</td>
-            <td>{{ formatCurrency(tenant.rent_price) }}</td>
+            <td>{{ formatCurrency(getTotalFee(tenant)) }}</td>
             <td>
               <span class="status-badge" :class="`status-${tenant.status}`">
                 {{ getStatusLabel(tenant.status) }}
@@ -128,19 +145,27 @@
       :tenant-id="selectedDetailId"
       @close="closeDetailModal"
       @set-inactive="handleSetInactive"
+      @updated="onTenantUpdated"
     />
 
     <!-- Delete Confirmation -->
-    <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="showDeleteConfirm = false">
+    <BaseModal v-if="showDeleteConfirm" :visible="true" size="sm" :show-close="false" @close="showDeleteConfirm = false">
       <div class="confirm-modal">
-        <h3>Hapus Penyewa</h3>
-        <p>Apakah Anda yakin ingin menghapus <strong>{{ tenantToDelete?.name }}</strong>?</p>
+        <h3>{{ confirmMode === 'inactive' ? 'Nonaktifkan Penyewa' : 'Hapus Penyewa' }}</h3>
+        <p v-if="confirmMode === 'inactive'">
+          Apakah Anda yakin ingin menonaktifkan <strong>{{ tenantToDelete?.name }}</strong>?
+        </p>
+        <p v-else>
+          Apakah Anda yakin ingin menghapus <strong>{{ tenantToDelete?.name }}</strong>?
+        </p>
         <div class="confirm-actions">
           <button class="btn-cancel" @click="showDeleteConfirm = false">Batal</button>
-          <button class="btn-delete" @click="deleteTenant">Hapus</button>
+          <button class="btn-delete" @click="confirmMode === 'inactive' ? setInactiveTenant() : deleteTenant()">
+            {{ confirmMode === 'inactive' ? 'Nonaktifkan' : 'Hapus' }}
+          </button>
         </div>
       </div>
-    </div>
+    </BaseModal>
   </div>
 </template>
 
@@ -149,6 +174,8 @@ import { ref, computed, onMounted } from 'vue'
 import tenantService, { type Tenant } from '../services/tenantService'
 import TenantFormModal from '../components/TenantFormModal.vue'
 import TenantDetailModal from '../components/TenantDetailModal.vue'
+import BaseModal from '../../../shared/components/base/BaseModal.vue'
+import { useToastStore } from '../../../shared/stores/toastStore'
 
 // State
 const loading = ref(true)
@@ -158,12 +185,15 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const searchQuery = ref('')
 const showFilters = ref(false)
+const statusFilter = ref('')
 const showModal = ref(false)
 const showDeleteConfirm = ref(false)
 const selectedTenant = ref<Tenant | null>(null)
 const tenantToDelete = ref<Tenant | null>(null)
 const showDetailModal = ref(false)
 const selectedDetailId = ref('')
+const confirmMode = ref<'delete' | 'inactive'>('delete')
+const toast = useToastStore()
 
 // TODO: Get from current user context/store
 const currentKostId = ref<string>('')
@@ -196,10 +226,12 @@ async function fetchTenants() {
     const response = await tenantService.getAll({
       kost_id: currentKostId.value || undefined,
       search: searchQuery.value || undefined,
+      status: (statusFilter.value || undefined) as any,
       page: currentPage.value,
       page_size: pageSize.value,
     })
-    tenants.value = response.items
+    const items = response.items.filter(t => t.is_active !== false)
+    tenants.value = statusFilter.value ? items : items.filter(t => t.status !== 'inaktif')
     total.value = response.total
   } catch (error) {
     console.error('Failed to fetch tenants:', error)
@@ -215,6 +247,11 @@ function debouncedSearch() {
     currentPage.value = 1
     fetchTenants()
   }, 300)
+}
+
+function applyFilters() {
+  currentPage.value = 1
+  fetchTenants()
 }
 
 function goToPage(page: number) {
@@ -241,7 +278,7 @@ function handleSetInactive() {
   const tenant = tenants.value.find(t => t.id === selectedDetailId.value)
   if (tenant) {
     closeDetailModal()
-    confirmDelete(tenant)
+    confirmInactive(tenant)
   }
 }
 
@@ -260,7 +297,18 @@ function onTenantSaved() {
   fetchTenants()
 }
 
+function onTenantUpdated() {
+  fetchTenants()
+}
+
 function confirmDelete(tenant: Tenant) {
+  confirmMode.value = 'delete'
+  tenantToDelete.value = tenant
+  showDeleteConfirm.value = true
+}
+
+function confirmInactive(tenant: Tenant) {
+  confirmMode.value = 'inactive'
   tenantToDelete.value = tenant
   showDeleteConfirm.value = true
 }
@@ -272,9 +320,24 @@ async function deleteTenant() {
     await tenantService.delete(tenantToDelete.value.id)
     showDeleteConfirm.value = false
     tenantToDelete.value = null
+    toast.push('success', 'Penyewa berhasil dihapus.')
     fetchTenants()
   } catch (error) {
     console.error('Failed to delete tenant:', error)
+  }
+}
+
+async function setInactiveTenant() {
+  if (!tenantToDelete.value) return
+  try {
+    await tenantService.update(tenantToDelete.value.id, { status: 'inaktif' as any })
+    showDeleteConfirm.value = false
+    tenantToDelete.value = null
+    toast.push('success', 'Penyewa berhasil dinonaktifkan.')
+    fetchTenants()
+  } catch (error) {
+    console.error('Failed to set tenant inactive:', error)
+    toast.push('error', 'Gagal menonaktifkan penyewa.')
   }
 }
 
@@ -299,6 +362,15 @@ function formatDate(dateStr: string | null): string {
   return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function getTotalFee(tenant: Tenant): number | null {
+  const rent = tenant.rent_price || 0
+  const trash = tenant.trash_fee || 0
+  const security = tenant.security_fee || 0
+  const admin = tenant.admin_fee || 0
+  const total = rent + trash + security + admin
+  return total > 0 ? total : null
+}
+
 function formatCurrency(amount: number | null): string {
   if (!amount) return '-'
   return new Intl.NumberFormat('id-ID', { 
@@ -312,7 +384,10 @@ function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     aktif: 'Aktif',
     dp: 'DP',
-    inactive: 'Tidak Aktif',
+    telat: 'Telat',
+    renovasi: 'Renovasi',
+    pindah: 'Pindahan/Kosong',
+    inaktif: 'Tidak Aktif',
   }
   return labels[status] || status
 }
@@ -420,6 +495,45 @@ onMounted(() => {
   border-color: var(--primary);
 }
 
+/* Filters */
+.filters-panel {
+  padding: 1rem 1.25rem;
+}
+
+.filters-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 220px;
+}
+
+.filter-item label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filter-item select {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+
+.filter-item select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
 /* Loading */
 .loading-container {
   display: flex;
@@ -523,7 +637,7 @@ onMounted(() => {
   color: #D97706;
 }
 
-.status-inactive {
+.status-inaktif {
   background: #F3F4F6;
   color: #6B7280;
 }

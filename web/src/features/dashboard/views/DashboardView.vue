@@ -6,7 +6,7 @@
     </div>
 
     <!-- Main Grid -->
-    <div class="dashboard-grid">
+    <div v-if="!loading" class="dashboard-grid">
       <!-- Chart Section -->
       <div class="chart-section card">
         <div class="chart-header">
@@ -30,7 +30,7 @@
         <div class="stat-card card">
           <div class="stat-row">
             <div class="stat-content">
-              <p class="stat-label">Total Penyewa</p>
+              <p class="stat-label">Penyewa Aktif</p>
               <h3 class="stat-value">{{ stats.total_tenants }}</h3>
               <div v-if="stats.tenant_change_percent !== null" class="stat-change positive">
                 <span class="change-arrow">↗</span>
@@ -62,7 +62,7 @@
             <div class="stat-content">
               <p class="stat-label">Kamar Kosong</p>
               <h3 class="stat-value">{{ stats.empty_rooms }}</h3>
-              <p class="stat-warning">{{ 100 - stats.occupancy_rate }}% okupansi rendah</p>
+              <p class="stat-warning">{{ 100 - stats.occupancy_rate }}% tingkat hunian rendah</p>
             </div>
             <div class="stat-icon red">
               <span class="material-symbols-outlined">door_front</span>
@@ -73,7 +73,7 @@
     </div>
 
     <!-- Status Tracker Table -->
-    <div class="tracker-section card">
+    <div v-if="!loading" class="tracker-section card">
       <div class="tracker-header">
         <h2 class="tracker-title">Status Tracker</h2>
         <button class="view-all-btn">Lihat Semua</button>
@@ -125,6 +125,59 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div v-else class="dashboard-grid">
+      <div class="chart-section card">
+        <div class="chart-header">
+          <div>
+            <h2 class="chart-title">Garis Tren Pendapatan</h2>
+            <p class="chart-subtitle">Memuat data...</p>
+          </div>
+        </div>
+        <div class="chart-container skeleton-block"></div>
+      </div>
+
+      <div class="stats-section">
+        <div class="stat-card card">
+          <div class="stat-row">
+            <div class="stat-content">
+              <p class="stat-label">Penyewa Aktif</p>
+              <div class="skeleton-line w-120"></div>
+              <div class="skeleton-line w-160"></div>
+            </div>
+            <div class="stat-icon blue">
+              <span class="material-symbols-outlined">group</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card card">
+          <div class="stat-row">
+            <div class="stat-content">
+              <p class="stat-label">Total Kamar</p>
+              <div class="skeleton-line w-120"></div>
+              <div class="skeleton-line w-160"></div>
+            </div>
+            <div class="stat-icon orange">
+              <span class="material-symbols-outlined">bedroom_parent</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card card">
+          <div class="stat-row">
+            <div class="stat-content">
+              <p class="stat-label">Kamar Kosong</p>
+              <div class="skeleton-line w-120"></div>
+              <div class="skeleton-line w-160"></div>
+            </div>
+            <div class="stat-icon red">
+              <span class="material-symbols-outlined">door_front</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -236,36 +289,15 @@ async function onPeriodChange() {
   }
 }
 
-// Chart data from API - process to carry forward 0 values for past weeks
+// Chart data from API
 const chartData = computed(() => {
   const items = incomeTrend.value.items
-  const now = new Date()
-  
-  // Process data: if a week has 0 amount AND is not in the future, use previous week's value
-  const processedAmounts: number[] = []
-  
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]
-    if (!item) continue
-    
-    const amount = Number(item.amount)
-    
-    // Check if this is a future week by parsing the label
-    // Labels are like "Jan W1", "Feb W2", etc.
-    const isFutureWeek = isLabelInFuture(item.label, now)
-    
-    if (amount === 0 && !isFutureWeek && i > 0) {
-      // Use previous value for stagnant line
-      processedAmounts.push(processedAmounts[i - 1] ?? 0)
-    } else {
-      processedAmounts.push(amount / 1000000)
-    }
-  }
-  
+  const amounts = items.map((item) => (Number(item.amount) || 0) / 1000000)
+
   return {
     labels: items.map(i => i.label),
     datasets: [{
-      data: processedAmounts,
+      data: amounts,
       borderColor: '#0f766d',
       backgroundColor: (context: any) => {
         const ctx = context.chart.ctx
@@ -283,46 +315,6 @@ const chartData = computed(() => {
     }],
   }
 })
-
-/**
- * Check if a label is in the future
- * Handles formats: "Minggu 1", "Minggu 2" (month view) or "Feb W1" (semester/year view)
- */
-function isLabelInFuture(label: string, now: Date): boolean {
-  const currentWeekOfMonth = Math.ceil(now.getDate() / 7)
-  const currentMonth = now.getMonth()
-  
-  // Handle "Minggu X" format (This Month view)
-  if (label.startsWith('Minggu')) {
-    const weekNum = parseInt(label.replace('Minggu ', '') || '1')
-    return weekNum > currentWeekOfMonth
-  }
-  
-  // Handle "Mon WX" format (Semester/Year view)
-  const monthMap: Record<string, number> = {
-    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Mei': 4, 'Jun': 5,
-    'Jul': 6, 'Agu': 7, 'Sep': 8, 'Okt': 9, 'Nov': 10, 'Des': 11
-  }
-  
-  const parts = label.split(' ')
-  if (parts.length < 2) return false
-  
-  const monthStr = parts[0]
-  const weekStr = parts[1]
-  
-  const month = monthMap[monthStr ?? '']
-  if (month === undefined) return false
-  
-  const weekNum = parseInt(weekStr?.replace('W', '') ?? '1')
-  
-  // If month is in the future
-  if (month > currentMonth) return true
-  
-  // If same month but week is in the future
-  if (month === currentMonth && weekNum > currentWeekOfMonth) return true
-  
-  return false
-}
 
 const chartOptions = {
   responsive: true,
@@ -381,6 +373,30 @@ const chartOptions = {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Skeletons */
+.skeleton-block {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, #f3f4f6, #e5e7eb, #f3f4f6);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f3f4f6, #e5e7eb, #f3f4f6);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.w-120 { width: 120px; }
+.w-160 { width: 160px; margin-top: 0.5rem; }
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* Grid Layout */

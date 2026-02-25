@@ -10,6 +10,7 @@ from io import BytesIO
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import cast, String
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
@@ -167,7 +168,7 @@ def _add_payments_sheet(wb: Workbook, db: Session, kost_ids: list, start_date: d
     
     # Query income transactions
     query = db.query(Transaction).filter(
-        Transaction.type == "income",
+        cast(Transaction.type, String) == "income",
         Transaction.transaction_date >= start_date,
         Transaction.transaction_date <= end_date,
     )
@@ -209,7 +210,7 @@ def _add_expenses_sheet(wb: Workbook, db: Session, kost_ids: list, start_date: d
     
     # Query expense transactions
     query = db.query(Transaction).filter(
-        Transaction.type == "expense",
+        cast(Transaction.type, String) == "expense",
         Transaction.transaction_date >= start_date,
         Transaction.transaction_date <= end_date,
     )

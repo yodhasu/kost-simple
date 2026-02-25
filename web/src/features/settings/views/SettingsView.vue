@@ -1,173 +1,40 @@
 <template>
   <div class="settings-view">
-    <div class="page-header">
-      <div class="header-content">
-        <h1 class="page-title">Pengaturan Region</h1>
-        <p class="page-subtitle">Kelola daftar region untuk properti kost Anda</p>
+    <!-- Tab Navigation -->
+    <div class="tabs-container">
+      <div class="tabs-header">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          class="tab-btn"
+          :class="{ active: activeTab === tab.id }"
+          @click="activeTab = tab.id"
+        >
+          <span class="material-symbols-outlined">{{ tab.icon }}</span>
+          {{ tab.label }}
+        </button>
       </div>
-      <button class="btn-primary" @click="openModal()">
-        <span class="material-symbols-outlined">add</span>
-        Tambah Region
-      </button>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="loading-state">
-      <span class="material-symbols-outlined spinner">sync</span>
-      <p>Memuat data region...</p>
-    </div>
-
-    <!-- Empty State -->
-    <div v-else-if="regions.length === 0" class="empty-state">
-      <span class="material-symbols-outlined empty-icon">map</span>
-      <h3>Belum ada region</h3>
-      <p>Tambahkan region pertama Anda untuk mulai mengelola kost.</p>
-      <button class="btn-primary" @click="openModal()">
-        <span class="material-symbols-outlined">add</span>
-        Tambah Region
-      </button>
-    </div>
-
-    <!-- Region List -->
-    <div v-else class="region-list-container">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Nama Region</th>
-            <th class="col-actions">Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="region in regions" :key="region.id">
-            <td class="font-medium">{{ region.name }}</td>
-            <td class="col-actions">
-              <button class="btn-icon" @click="openModal(region)" title="Edit">
-                <span class="material-symbols-outlined">edit</span>
-              </button>
-              <button class="btn-icon btn-danger" @click="confirmDelete(region)" title="Hapus">
-                <span class="material-symbols-outlined">delete</span>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Form Modal -->
-    <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal-container">
-        <div class="modal-header">
-          <h2 class="modal-title">{{ editingRegion ? 'Edit Region' : 'Tambah Region Baru' }}</h2>
-          <button class="btn-close" @click="closeModal">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-        
-        <form @submit.prevent="handleSubmit">
-          <div class="modal-body">
-            <div class="form-group">
-              <label class="form-label">Nama Region</label>
-              <input 
-                v-model="form.name" 
-                type="text" 
-                class="form-input" 
-                placeholder="Contoh: Jakarta Selatan"
-                required
-                autofocus
-              />
-            </div>
-          </div>
-          
-          <div class="modal-footer">
-            <button type="button" class="btn-cancel" @click="closeModal">Batal</button>
-            <button type="submit" class="btn-submit" :disabled="saving">
-              {{ saving ? 'Menyimpan...' : 'Simpan' }}
-            </button>
-          </div>
-        </form>
-      </div>
+    <!-- Tab Content -->
+    <div class="tab-panel">
+      <RegionTab v-if="activeTab === 'region'" />
+      <AdminAccountTab v-else-if="activeTab === 'admin'" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import regionService, { type Region } from '../../regions/services/regionService'
+import { ref } from 'vue'
+import RegionTab from '../components/RegionTab.vue'
+import AdminAccountTab from '../components/AdminAccountTab.vue'
 
-const regions = ref<Region[]>([])
-const loading = ref(true)
-const saving = ref(false)
-const showModal = ref(false)
-const editingRegion = ref<Region | null>(null)
+const activeTab = ref('region')
 
-const form = ref({
-  name: ''
-})
-
-onMounted(() => {
-  loadRegions()
-})
-
-async function loadRegions() {
-  loading.value = true
-  try {
-    const response = await regionService.getAll()
-    regions.value = response.items
-  } catch (error) {
-    console.error('Failed to load regions:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-function openModal(region?: Region) {
-  if (region) {
-    editingRegion.value = region
-    form.value.name = region.name
-  } else {
-    editingRegion.value = null
-    form.value.name = ''
-  }
-  showModal.value = true
-}
-
-function closeModal() {
-  showModal.value = false
-  editingRegion.value = null
-  form.value.name = ''
-}
-
-async function handleSubmit() {
-  if (!form.value.name.trim()) return
-
-  saving.value = true
-  try {
-    if (editingRegion.value) {
-      await regionService.update(editingRegion.value.id, form.value.name)
-    } else {
-      await regionService.create(form.value.name)
-    }
-    await loadRegions()
-    closeModal()
-  } catch (error) {
-    console.error('Failed to save region:', error)
-    alert('Gagal menyimpan region')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function confirmDelete(region: Region) {
-  if (!confirm(`Apakah Anda yakin ingin menghapus region "${region.name}"?`)) return
-
-  try {
-    await regionService.delete(region.id)
-    await loadRegions()
-  } catch (error) {
-    console.error('Failed to delete region:', error)
-    alert('Gagal menghapus region')
-  }
-}
+const tabs = [
+  { id: 'region', label: 'Region', icon: 'map' },
+  { id: 'admin', label: 'Akun Admin', icon: 'admin_panel_settings' },
+]
 </script>
 
 <style scoped>
@@ -177,268 +44,399 @@ async function confirmDelete(region: Region) {
   margin: 0 auto;
 }
 
-.page-header {
+/* Tab Navigation */
+.tabs-container {
+  margin-bottom: 1.5rem;
+}
+
+.tabs-header {
+  display: flex;
+  gap: 0.25rem;
+  background: white;
+  padding: 0.375rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border: none;
+  background: transparent;
+  border-radius: calc(var(--radius-lg) - 4px);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex: 1;
+  justify-content: center;
+}
+
+.tab-btn .material-symbols-outlined {
+  font-size: 1.25rem;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: var(--border-light);
+}
+
+.tab-btn.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 1px 3px rgba(15, 118, 109, 0.3);
+}
+
+/* Tab Content Wrapper */
+.tab-panel {
+  min-height: 300px;
+}
+</style>
+
+<!-- Shared styles for tab content — unscoped so child components inherit -->
+<style>
+/* Tab Content Layout */
+.tab-content .tab-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
-.page-title {
-  font-size: 1.5rem;
+.tab-content .tab-title {
+  font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #111827;
   margin-bottom: 0.25rem;
 }
 
-.page-subtitle {
-  color: var(--text-secondary);
+.tab-content .tab-subtitle {
+  color: #6B7280;
   font-size: 0.875rem;
+  margin: 0;
+}
+
+/* Add Button */
+.tab-content .btn-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: #0D9488;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tab-content .btn-add:hover:not(:disabled) {
+  background: #0F766E;
+}
+
+.tab-content .btn-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Table Styles */
-.region-list-container {
+.tab-content .list-container {
   background: white;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid #E5E7EB;
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.data-table {
+.tab-content .data-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.data-table th,
-.data-table td {
-  padding: 1rem 1.5rem;
+.tab-content .data-table th,
+.tab-content .data-table td {
+  padding: 0.875rem 1.25rem;
   text-align: left;
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid #F3F4F6;
 }
 
-.data-table th {
+.tab-content .data-table th {
   background: #F9FAFB;
   font-weight: 600;
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: #6B7280;
   letter-spacing: 0.05em;
 }
 
-.data-table tr:last-child td {
+.tab-content .data-table tr:last-child td {
   border-bottom: none;
 }
 
-.col-actions {
+.tab-content .data-table .font-medium {
+  font-weight: 500;
+  color: #111827;
+}
+
+.tab-content .data-table .text-secondary {
+  color: #6B7280;
+  font-size: 0.875rem;
+}
+
+.tab-content .col-actions {
   width: 100px;
   text-align: right;
   white-space: nowrap;
 }
 
-/* Button Styles */
-.btn-primary {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  background: var(--primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
+.tab-content .col-center {
+  text-align: center;
+}
+
+.tab-content .unit-badge {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  background: #F0FDFA;
+  color: #0D9488;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
   font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
 }
 
-.btn-primary:hover {
-  background: var(--primary-dark);
-}
-
-.btn-icon {
+/* Icon Buttons */
+.tab-content .btn-icon {
   width: 32px;
   height: 32px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
+  color: #9CA3AF;
+  border-radius: 6px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-left: 0.25rem;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
 }
 
-.btn-icon:hover {
-  background: var(--bg-secondary);
-  color: var(--primary);
+.tab-content .btn-icon:hover {
+  background: #F3F4F6;
+  color: #0D9488;
 }
 
-.btn-icon.btn-danger:hover {
+.tab-content .btn-icon-danger:hover {
   background: #FEF2F2;
-  color: var(--danger);
+  color: #DC2626;
 }
 
-/* Modal Styles */
-.modal-overlay {
+/* Loading & Empty States */
+.tab-content .loading-state,
+.tab-content .empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: white;
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid #E5E7EB;
+}
+
+.tab-content .spinner {
+  animation: settings-spin 1s linear infinite;
+  font-size: 2rem;
+  color: #0D9488;
+  margin-bottom: 1rem;
+}
+
+@keyframes settings-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.tab-content .empty-icon {
+  font-size: 3rem;
+  color: #9CA3AF;
+  margin-bottom: 1rem;
+}
+
+.tab-content .empty-state h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #111827;
+}
+
+.tab-content .empty-state p {
+  color: #6B7280;
+  margin-bottom: 1.5rem;
+}
+
+/* Modal Styles (shared for Region/Admin modals) */
+.tab-content .modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
   padding: 1rem;
 }
 
-.modal-container {
+.tab-content .modal-container {
   background: white;
-  border-radius: var(--radius-lg);
+  border-radius: 16px;
   width: 100%;
   max-width: 500px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
-.modal-header {
+.tab-content .modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.tab-content .modal-header .header-content {
+  flex: 1;
+}
+
+.tab-content .modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+
+.tab-content .modal-subtitle {
+  font-size: 0.875rem;
+  color: #6B7280;
+  margin: 0;
+}
+
+.tab-content .close-btn {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.modal-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.btn-close {
-  background: transparent;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   border: none;
-  color: var(--text-secondary);
+  background: transparent;
   cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
+  border-radius: 8px;
+  color: #9CA3AF;
 }
 
-.btn-close:hover {
-  background: var(--bg-secondary);
+.tab-content .close-btn:hover {
+  background: #F3F4F6;
+  color: #4B5563;
 }
 
-.modal-body {
+.tab-content .modal-body {
   padding: 1.5rem;
 }
 
-.modal-footer {
-  padding: 1.25rem 1.5rem;
-  background: #F9FAFB;
-  border-top: 1px solid var(--border-light);
+.tab-content .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.tab-content .form-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.tab-content .required {
+  color: #EF4444;
+}
+
+.tab-content .form-input {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  background: #FAFAFA;
+  color: #111827;
+  transition: all 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tab-content .form-input:focus {
+  outline: none;
+  border-color: #0D9488;
+  background: white;
+}
+
+.tab-content .form-input::placeholder {
+  color: #9CA3AF;
+}
+
+.tab-content .form-actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
-  border-bottom-left-radius: var(--radius-lg);
-  border-bottom-right-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  background: #F9FAFB;
+  border-top: 1px solid #F3F4F6;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
 }
 
-/* Form Elements */
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-label {
-  display: block;
+.tab-content .btn-cancel {
+  padding: 0.75rem 1.25rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-}
-
-.form-input {
-  width: 100%;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 0.9375rem;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-light);
-}
-
-.btn-cancel {
-  padding: 0.625rem 1rem;
+  color: #6B7280;
   background: white;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
-  font-weight: 500;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.btn-cancel:hover {
+.tab-content .btn-cancel:hover {
   background: #F9FAFB;
 }
 
-.btn-submit {
-  padding: 0.625rem 1.25rem;
-  background: var(--primary);
+.tab-content .btn-submit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: #0D9488;
   color: white;
   border: none;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.btn-submit:hover:not(:disabled) {
-  background: var(--primary-dark);
+.tab-content .btn-submit:hover:not(:disabled) {
+  background: #0F766E;
 }
 
-.btn-submit:disabled {
-  opacity: 0.7;
+.tab-content .btn-submit:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Loading & Empty States */
-.loading-state, .empty-state {
-  text-align: center;
-  padding: 4rem 2rem;
-  background: white;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-}
-
-.spinner {
-  animation: spin 1s linear infinite;
-  font-size: 2rem;
-  color: var(--primary);
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.empty-icon {
-  font-size: 3rem;
-  color: var(--text-muted);
-  margin-bottom: 1rem;
-}
-
-.empty-state h3 {
+.tab-content .btn-submit .material-symbols-outlined {
   font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.empty-state p {
-  color: var(--text-secondary);
-  margin-bottom: 1.5rem;
 }
 </style>

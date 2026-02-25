@@ -8,7 +8,8 @@ export interface PaymentCreate {
 }
 
 export interface ExpenseCreate {
-  kost_id: string
+  kost_id?: string
+  region_id?: string
   category: string
   amount: number
   transaction_date: string
@@ -19,11 +20,12 @@ export interface TransactionResponse {
   id: string
   kost_id: string
   tenant_id: string | null
-  type: string
+  type: 'income' | 'expense'
   category: string | null
   amount: number
   transaction_date: string
   description: string | null
+  region_id: string | null
   created_at: string
 }
 

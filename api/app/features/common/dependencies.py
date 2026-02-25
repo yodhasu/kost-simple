@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.auth import get_current_firebase_uid
 from app.features.users.service import UserProfileService
+from app.features.users.user_region_model import UserRegion
 
 
 async def get_current_user_region(
@@ -26,7 +27,7 @@ async def get_current_user_region(
         - If query param region_id is provided, use it.
         - If not provided, return None (implies all regions or no filter).
     - If user is NOT OWNER:
-        - Must use the region_id from their profile.
+        - Must use the first region_id from user_regions table.
         - Query param region_id is ignored (for security).
     """
     user_service = UserProfileService(db)
@@ -42,5 +43,9 @@ async def get_current_user_region(
         # Owner can override region via query param
         return region_id
     
-    # Non-owners must use their assigned region
-    return profile.region_id
+    # Non-owners: get their assigned region from user_regions table
+    user_region = db.query(UserRegion).filter(
+        UserRegion.user_id == profile.id
+    ).first()
+    
+    return user_region.region_id if user_region else None

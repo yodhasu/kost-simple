@@ -22,26 +22,39 @@
             <span class="material-symbols-outlined">location_on</span>
             Region
           </label>
-          <select v-model="selectedRegionId" class="region-select" :disabled="loadingRegions">
+          <select
+            v-model="selectedRegionId"
+            class="region-select"
+            :disabled="loadingRegions || setupRequired || regions.length === 0"
+          >
             <option v-if="loadingRegions" value="" disabled>Memuat...</option>
             <option v-for="region in regions" :key="region.id" :value="region.id">
               {{ region.name }}
             </option>
           </select>
+          <p v-if="setupRequired" class="setup-hint">
+            Setup awal diperlukan. Tambahkan region dan akun admin di Pengaturan.
+          </p>
         </div>
 
         <div class="nav-divider"></div>
         
-        <router-link
-          v-for="item in navItems"
-          :key="item.path"
-          :to="item.path"
-          class="nav-item"
-          :class="{ active: $route.path === item.path }"
-        >
-          <span class="material-symbols-outlined">{{ item.icon }}</span>
-          <span class="nav-label">{{ item.label }}</span>
-        </router-link>
+        <template v-for="item in navItems" :key="item.path">
+          <router-link
+            v-if="!item.disabled"
+            :to="item.path"
+            class="nav-item"
+            :class="{ active: $route.path === item.path }"
+          >
+            <span class="material-symbols-outlined">{{ item.icon }}</span>
+            <span class="nav-label">{{ item.label }}</span>
+          </router-link>
+          <div v-else class="nav-item nav-item-disabled" :title="'Selesaikan setup di Pengaturan terlebih dahulu'">
+            <span class="material-symbols-outlined">{{ item.icon }}</span>
+            <span class="nav-label">{{ item.label }}</span>
+            <span class="material-symbols-outlined nav-lock">lock</span>
+          </div>
+        </template>
 
         <div class="nav-divider"></div>
 
@@ -62,6 +75,7 @@
 
     <!-- Main Content -->
     <main class="main-wrapper">
+      <ToastContainer />
       <!-- Header -->
       <header class="main-header">
         <h1 class="page-title">{{ pageTitle }}</h1>
@@ -84,11 +98,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '../shared/composables/useAuth'
 import { useUserStore } from '../shared/stores/userStore'
 import regionService, { type Region } from '../features/regions/services/regionService'
+import ToastContainer from '../shared/components/base/ToastContainer.vue'
+import adminAccountService from '../features/settings/services/adminAccountService'
 
 const route = useRoute()
 const router = useRouter()
@@ -99,15 +115,18 @@ const { userDisplayName, userRole, signOut } = useAuth()
 const regions = ref<Region[]>([])
 const loadingRegions = ref(true)
 const selectedRegionId = ref<string>('')
+const adminCount = ref<number | null>(null)
+const loadingAdmins = ref(false)
+const setupRequired = ref(false)
 
 onMounted(async () => {
-  await loadRegions()
+  // Setup check runs via watch(userRole) below (needs role info).
 })
 
 async function loadRegions() {
   loadingRegions.value = true
   try {
-    const response = await regionService.getAll()
+    const response = await regionService.getAll(1, 100)
     regions.value = response.items
     
     // Set initial selected region
@@ -123,6 +142,73 @@ async function loadRegions() {
     loadingRegions.value = false
   }
 }
+
+async function loadAdminAccounts() {
+  loadingAdmins.value = true
+  try {
+    const response = await adminAccountService.getAll()
+    adminCount.value = response.items.length
+  } catch (e) {
+    console.error('Failed to load admin accounts:', e)
+    adminCount.value = null
+  } finally {
+    loadingAdmins.value = false
+  }
+}
+
+async function checkOwnerSetup() {
+  if (userRole.value !== 'owner') {
+    setupRequired.value = false
+    return
+  }
+
+  await Promise.all([loadRegions(), loadAdminAccounts()])
+
+  const regionsEmpty = regions.value.length === 0
+  const adminsEmpty = (adminCount.value ?? 0) === 0
+  setupRequired.value = regionsEmpty || adminsEmpty
+
+  if (setupRequired.value && route.path !== '/settings') {
+    router.replace('/settings')
+  }
+}
+
+// Run setup checks once role is known and occasionally when coming back to the tab.
+watch(
+  () => userRole.value,
+  async (role) => {
+    if (role === 'owner') {
+      await checkOwnerSetup()
+      window.addEventListener('focus', checkOwnerSetup)
+      window.addEventListener('setup-changed', checkOwnerSetup as any)
+    } else {
+      window.removeEventListener('focus', checkOwnerSetup)
+      window.removeEventListener('setup-changed', checkOwnerSetup as any)
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', checkOwnerSetup)
+  window.removeEventListener('setup-changed', checkOwnerSetup as any)
+})
+
+watch(
+  () => route.path,
+  async (path) => {
+    if (userRole.value !== 'owner') return
+    if (setupRequired.value && path !== '/settings') {
+      router.replace('/settings')
+      return
+    }
+    // After owner finishes setup, leaving Settings should re-check.
+    // This avoids requiring a full reload to unlock navigation.
+    if (path !== '/settings') {
+      await checkOwnerSetup()
+    }
+  },
+)
 
 // Watch for region changes and update store
 watch(selectedRegionId, (newRegionId, oldRegionId) => {
@@ -140,8 +226,10 @@ watch(selectedRegionId, (newRegionId, oldRegionId) => {
   }
 })
 
-const navItems = computed(() => {
-  const items = [
+type NavItem = { path: string; label: string; icon: string; disabled?: boolean }
+
+const navItems = computed<NavItem[]>(() => {
+  const items: NavItem[] = [
     { path: '/', label: 'Beranda', icon: 'dashboard' },
     { path: '/tenants', label: 'Daftar Penyewa', icon: 'people' },
     { path: '/payments', label: 'Aksi & Pembayaran', icon: 'payments' },
@@ -149,7 +237,12 @@ const navItems = computed(() => {
   ]
   
   if (userRole.value === 'owner') {
-    items.push({ path: '/settings', label: 'Pengaturan Region', icon: 'settings' })
+    items.push({ path: '/settings', label: 'Pengaturan', icon: 'settings' })
+  }
+
+  // Owner must complete initial setup (regions + admin accounts) before using other menus.
+  if (userRole.value === 'owner' && setupRequired.value) {
+    return items.map((it) => (it.path === '/settings' ? it : { ...it, disabled: true }))
   }
   
   return items
@@ -325,6 +418,13 @@ async function handleLogout() {
   cursor: not-allowed;
 }
 
+.setup-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -348,6 +448,18 @@ async function handleLogout() {
 
 .nav-item .material-symbols-outlined {
   font-size: 1.25rem;
+}
+
+.nav-item-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.nav-lock {
+  margin-left: auto;
+  font-size: 1.1rem;
+  color: var(--text-muted);
 }
 
 .nav-divider {

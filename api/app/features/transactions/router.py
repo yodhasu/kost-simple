@@ -4,7 +4,6 @@ Transactions router - API endpoints.
 
 from uuid import UUID
 from datetime import date
-from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -24,15 +23,16 @@ class PaymentCreate(BaseModel):
     """Schema for creating a rent payment."""
     kost_id: UUID
     tenant_id: UUID
-    amount: Decimal = Field(..., ge=0)
+    amount: int = Field(..., ge=0)
     transaction_date: date
 
 
 class ExpenseCreate(BaseModel):
     """Schema for creating an expense."""
-    kost_id: UUID
+    kost_id: Optional[UUID] = None
+    region_id: Optional[UUID] = None
     category: str
-    amount: Decimal = Field(..., ge=0)
+    amount: int = Field(..., ge=0)
     transaction_date: date
     description: Optional[str] = None
 
@@ -58,6 +58,9 @@ async def create_payment(data: PaymentCreate, db: Session = Depends(get_db)):
             detail="Tenant not found"
         )
     
+    # Get kost to retrieve region_id
+    kost = db.query(Kost).filter(Kost.id == data.kost_id).first()
+    
     # Create transaction
     transaction = Transaction(
         kost_id=data.kost_id,
@@ -67,6 +70,7 @@ async def create_payment(data: PaymentCreate, db: Session = Depends(get_db)):
         amount=data.amount,
         transaction_date=data.transaction_date,
         description=f"Pembayaran sewa dari {tenant.name}",
+        region_id=kost.region_id if kost else None,
     )
     db.add(transaction)
     
@@ -86,15 +90,27 @@ async def create_expense(data: ExpenseCreate, db: Session = Depends(get_db)):
     Record an expense.
     
     Creates a new transaction with type=expense.
+    Supports two modes:
+    - Kost-level: provide kost_id (region_id auto-derived)
+    - Region-level: provide region_id only (no kost)
     """
-    # Verify kost exists
-    kost = db.query(Kost).filter(Kost.id == data.kost_id).first()
-    
-    if not kost:
+    if not data.kost_id and not data.region_id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Kost not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either kost_id or region_id must be provided"
         )
+    
+    resolved_region_id = data.region_id
+    
+    if data.kost_id:
+        # Kost-level expense
+        kost = db.query(Kost).filter(Kost.id == data.kost_id).first()
+        if not kost:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Kost not found"
+            )
+        resolved_region_id = kost.region_id
     
     # Create transaction
     transaction = Transaction(
@@ -105,10 +121,10 @@ async def create_expense(data: ExpenseCreate, db: Session = Depends(get_db)):
         amount=data.amount,
         transaction_date=data.transaction_date,
         description=data.description,
+        region_id=resolved_region_id,
     )
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
     
     return transaction
-

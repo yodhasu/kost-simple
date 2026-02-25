@@ -2,9 +2,8 @@
 Transactions schemas (Pydantic models).
 """
 
-from typing import Optional
+from typing import Optional, Literal
 from datetime import date, datetime
-from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -12,9 +11,9 @@ from pydantic import BaseModel, Field
 
 class TransactionBase(BaseModel):
     """Base transaction schema."""
-    type: str
+    type: Literal["income", "expense"]
     category: Optional[str] = None
-    amount: Decimal = Field(..., ge=0)
+    amount: int = Field(..., ge=0)
     transaction_date: date
     description: Optional[str] = None
 
@@ -24,6 +23,7 @@ class TransactionResponse(TransactionBase):
     id: UUID
     kost_id: UUID
     tenant_id: Optional[UUID] = None
+    region_id: Optional[UUID] = None
     created_at: datetime
 
     class Config:
