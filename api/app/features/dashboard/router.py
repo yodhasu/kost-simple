@@ -40,7 +40,7 @@ async def get_dashboard_stats(
 @router.get("/income-trend", response_model=IncomeTrendResponse)
 async def get_income_trend(
     kost_id: Optional[UUID] = Query(None, description="Filter by kost ID"),
-    period: str = Query("month", regex="^(month|semester|year)$", description="Period: month, semester, or year"),
+    period: str = Query("month", pattern="^(month|semester|year)$", description="Period: month, semester, or year"),
     region_id: Optional[UUID] = Depends(get_current_user_region),
     db: Session = Depends(get_db),
 ):

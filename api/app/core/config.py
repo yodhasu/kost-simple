@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     # Firebase
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_SERVICE_ACCOUNT: str = ""
+    # Optional: base64-encoded service account JSON (avoids escaping issues in some hosts)
+    FIREBASE_SERVICE_ACCOUNT_B64: str = ""
     FIREBASE_SERVICE_ACCOUNT_PATH: str = ""
 
     # Cron Authentication

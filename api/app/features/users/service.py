@@ -58,7 +58,11 @@ class UserProfileService:
             region_ids = [user_region.region_id for user_region, _region in user_regions]
             region_names = [region.name for _user_region, region in user_regions]
 
-            firebase_user = get_firebase_user_by_uid(profile.firebase_uid)
+            try:
+                firebase_user = get_firebase_user_by_uid(profile.firebase_uid)
+            except Exception:
+                # If Firebase Admin isn't configured in this environment, don't 500 the whole list endpoint.
+                firebase_user = None
             items.append(
                 AdminAccountItem(
                     id=profile.id,
