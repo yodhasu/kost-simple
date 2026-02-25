@@ -223,13 +223,18 @@ function handleExportData() {
 
 @media (max-width: 768px) {
   .actions-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 480px) {
+  .actions-view {
+    padding: 1rem 0.75rem;
+  }
+
   .actions-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
   }
 }
 
@@ -273,6 +278,28 @@ function handleExportData() {
   color: var(--text-primary);
   font-size: 0.9375rem;
   text-align: center;
+}
+
+@media (max-width: 480px) {
+  .action-card {
+    padding: 1rem 0.75rem;
+    gap: 0.625rem;
+  }
+
+  .icon-wrapper {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .icon-wrapper .material-symbols-outlined {
+    font-size: 1.4rem;
+  }
+
+  .action-label {
+    font-size: 0.8125rem;
+    line-height: 1.2;
+  }
 }
 
 /* Colors */

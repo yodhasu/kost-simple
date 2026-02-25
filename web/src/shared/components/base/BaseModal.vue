@@ -184,15 +184,22 @@ function onBackdropClick() {
   }
 
   .base-modal-panel {
-    border-radius: 34px;
+    border-radius: 18px;
   }
 
   .base-modal-content {
-    padding: 3.2rem 1rem 0.9rem;
+    padding: 1.5rem 1rem 0.75rem;
   }
 
   .base-modal-footer {
     padding: 0.75rem 1rem 1rem;
+  }
+
+  .base-modal-close {
+    left: 0.75rem;
+    top: 0.75rem;
+    width: 32px;
+    height: 32px;
   }
 }
 </style>

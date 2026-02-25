@@ -556,7 +556,9 @@ onMounted(() => {
 
 /* Table */
 .table-container {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tenant-table {
@@ -569,6 +571,113 @@ onMounted(() => {
   padding: 1rem 1.25rem;
   vertical-align: middle;
   text-align: left;
+}
+
+@media (max-width: 640px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .header-actions .btn-filter,
+  .header-actions .btn-add {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .search-box {
+    max-width: none;
+  }
+
+  .tenant-table th,
+  .tenant-table td {
+    padding: 0.75rem 0.75rem;
+  }
+
+  .tenant-table thead {
+    display: none;
+  }
+
+  .tenant-table,
+  .tenant-table tbody,
+  .tenant-table tr,
+  .tenant-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .tenant-table tr {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .tenant-table td {
+    padding: 0;
+    border: none;
+  }
+
+  .tenant-table td:first-child {
+    width: 100%;
+    margin-bottom: 0.375rem;
+  }
+
+  .tenant-table td:nth-child(2),
+  .tenant-table td:nth-child(3),
+  .tenant-table td:nth-child(4) {
+    width: 100%;
+  }
+
+  .tenant-table td:nth-child(2)::before {
+    content: "HP: ";
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .tenant-table td:nth-child(3)::before {
+    content: "Masuk: ";
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .tenant-table td:nth-child(4)::before {
+    content: "Biaya: ";
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .tenant-table td:nth-child(5) {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .tenant-table td:nth-child(6) {
+    width: auto;
+    margin-left: auto;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .pagination-info {
+    font-size: 0.75rem;
+  }
 }
 
 .tenant-table th {

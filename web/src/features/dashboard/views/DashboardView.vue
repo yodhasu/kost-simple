@@ -776,8 +776,90 @@ const chartOptions = {
 }
 
 @media (max-width: 640px) {
+  .chart-section {
+    padding: 0.75rem 1rem;
+  }
+
+  .chart-container {
+    height: 120px;
+  }
+
+  .chart-title {
+    font-size: 0.875rem;
+  }
+
+  .chart-subtitle {
+    font-size: 0.75rem;
+  }
+
   .stats-section {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .stat-card {
+    padding: 0.625rem 0.5rem;
+  }
+
+  .stat-label {
+    font-size: 0.625rem;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
+  }
+
+  .stat-icon {
+    display: none;
+  }
+
+  .stat-change,
+  .stat-subtitle-text,
+  .stat-warning {
+    font-size: 0.625rem;
+  }
+
+  .tracker-table thead {
+    display: none;
+  }
+
+  .tracker-table,
+  .tracker-table tbody,
+  .tracker-table tr,
+  .tracker-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .tracker-table tr {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .tracker-table td {
+    padding: 0;
+    border: none;
+    text-align: left;
+  }
+
+  .tracker-table td:first-child {
+    width: 100%;
+    margin-bottom: 0.25rem;
+  }
+
+  .tracker-table td:nth-child(2),
+  .tracker-table td:nth-child(3),
+  .tracker-table td:nth-child(4) {
+    width: auto;
+  }
+
+  .action-cell {
+    margin-left: auto;
+    text-align: right;
   }
 }
 </style>

@@ -57,6 +57,8 @@ const tabs = [
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tab-btn {
@@ -95,6 +97,18 @@ const tabs = [
 /* Tab Content Wrapper */
 .tab-panel {
   min-height: 300px;
+}
+
+@media (max-width: 640px) {
+  .settings-view {
+    padding: 0.5rem 0;
+  }
+
+  .tab-btn {
+    padding: 0.625rem 0.875rem;
+    justify-content: center;
+    flex: 1;
+  }
 }
 </style>
 
@@ -152,7 +166,9 @@ const tabs = [
   background: white;
   border-radius: var(--radius-lg, 12px);
   border: 1px solid #E5E7EB;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
@@ -438,5 +454,28 @@ const tabs = [
 
 .tab-content .btn-submit .material-symbols-outlined {
   font-size: 1.125rem;
+}
+
+@media (max-width: 640px) {
+  .tab-content .tab-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .tab-content .btn-add {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tab-content .data-table th,
+  .tab-content .data-table td {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .tab-content .col-actions {
+    width: 80px;
+  }
 }
 </style>

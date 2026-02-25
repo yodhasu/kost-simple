@@ -3,3 +3,4 @@
 .env.production
 .agent
 QA_REPORT.md
+mobile_responsiveness_report.md

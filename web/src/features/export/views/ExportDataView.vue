@@ -238,6 +238,34 @@ async function handleExport() {
   }
 }
 
+@media (max-width: 480px) {
+  .config-section {
+    padding: 1rem 0.75rem;
+  }
+
+  .section-subtitle {
+    font-size: 0.8125rem;
+    margin-bottom: 1rem;
+  }
+
+  .checkbox-item {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .btn-download {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .info-note {
+    padding: 0.5rem;
+  }
+
+  .info-note p {
+    font-size: 0.6875rem;
+  }
+}
+
 .config-column {
   display: flex;
   flex-direction: column;

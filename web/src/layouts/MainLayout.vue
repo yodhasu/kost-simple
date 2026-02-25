@@ -1,7 +1,13 @@
 <template>
-  <div class="layout">
+  <div class="layout" :class="{ 'is-mobile': isMobile, 'sidebar-open': sidebarOpen }">
+    <div
+      v-if="isMobile && sidebarOpen"
+      class="sidebar-backdrop"
+      aria-hidden="true"
+      @click="closeSidebar"
+    />
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside id="app-sidebar" class="sidebar" :class="{ open: sidebarOpen }" :aria-hidden="isMobile && !sidebarOpen">
       <!-- User Profile -->
       <div class="user-profile">
         <div class="avatar-wrapper">
@@ -45,6 +51,7 @@
             :to="item.path"
             class="nav-item"
             :class="{ active: $route.path === item.path }"
+            @click="closeSidebarIfMobile"
           >
             <span class="material-symbols-outlined">{{ item.icon }}</span>
             <span class="nav-label">{{ item.label }}</span>
@@ -78,6 +85,17 @@
       <ToastContainer />
       <!-- Header -->
       <header class="main-header">
+        <button
+          v-if="isMobile"
+          type="button"
+          class="menu-btn"
+          :aria-label="sidebarOpen ? 'Tutup menu' : 'Buka menu'"
+          :aria-expanded="sidebarOpen"
+          aria-controls="app-sidebar"
+          @click="toggleSidebar"
+        >
+          <span class="material-symbols-outlined">menu</span>
+        </button>
         <h1 class="page-title">{{ pageTitle }}</h1>
         <div class="header-actions">
           <!-- <div class="notification-btn">
@@ -111,6 +129,29 @@ const router = useRouter()
 const userStore = useUserStore()
 const { userDisplayName, userRole, signOut } = useAuth()
 
+const isMobile = ref(false)
+const sidebarOpen = ref(false)
+let mobileMediaQuery: MediaQueryList | null = null
+
+function syncIsMobile() {
+  if (!mobileMediaQuery) return
+  isMobile.value = mobileMediaQuery.matches
+  if (!isMobile.value) sidebarOpen.value = false
+}
+
+function toggleSidebar() {
+  if (!isMobile.value) return
+  sidebarOpen.value = !sidebarOpen.value
+}
+
+function closeSidebar() {
+  sidebarOpen.value = false
+}
+
+function closeSidebarIfMobile() {
+  if (isMobile.value) closeSidebar()
+}
+
 // Region selector
 const regions = ref<Region[]>([])
 const loadingRegions = ref(true)
@@ -121,6 +162,13 @@ const setupRequired = ref(false)
 
 onMounted(async () => {
   // Setup check runs via watch(userRole) below (needs role info).
+  mobileMediaQuery = window.matchMedia('(max-width: 900px)')
+  syncIsMobile()
+  if (typeof (mobileMediaQuery as any).addEventListener === 'function') {
+    mobileMediaQuery.addEventListener('change', syncIsMobile)
+  } else if (typeof (mobileMediaQuery as any).addListener === 'function') {
+    ;(mobileMediaQuery as any).addListener(syncIsMobile)
+  }
 })
 
 async function loadRegions() {
@@ -192,11 +240,20 @@ watch(
 onBeforeUnmount(() => {
   window.removeEventListener('focus', checkOwnerSetup)
   window.removeEventListener('setup-changed', checkOwnerSetup as any)
+
+  if (mobileMediaQuery) {
+    if (typeof (mobileMediaQuery as any).removeEventListener === 'function') {
+      mobileMediaQuery.removeEventListener('change', syncIsMobile)
+    } else if (typeof (mobileMediaQuery as any).removeListener === 'function') {
+      ;(mobileMediaQuery as any).removeListener(syncIsMobile)
+    }
+  }
 })
 
 watch(
   () => route.path,
   async (path) => {
+    closeSidebarIfMobile()
     if (userRole.value !== 'owner') return
     if (setupRequired.value && path !== '/settings') {
       router.replace('/settings')
@@ -272,6 +329,7 @@ const userInitials = computed(() => {
 })
 
 async function handleLogout() {
+  closeSidebarIfMobile()
   await signOut()
   router.push('/login')
 }
@@ -280,7 +338,7 @@ async function handleLogout() {
 <style scoped>
 .layout {
   display: flex;
-  min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
@@ -290,13 +348,20 @@ async function handleLogout() {
   left: 0;
   top: 0;
   width: var(--sidebar-width);
-  height: 100vh;
+  height: 100dvh;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-md);
   z-index: 100;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.5);
+  z-index: 90;
 }
 
 /* User Profile */
@@ -498,7 +563,7 @@ async function handleLogout() {
   flex-direction: column;
   min-width: 0;
   margin-left: var(--sidebar-width);
-  height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
 }
 
@@ -516,6 +581,26 @@ async function handleLogout() {
   top: 0;
   z-index: 10;
   box-shadow: var(--shadow-sm);
+}
+
+.menu-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  transition: var(--transition-fast);
+}
+
+.menu-btn:hover {
+  background: var(--border-light);
+  color: var(--text-primary);
+}
+
+.menu-btn .material-symbols-outlined {
+  font-size: 1.5rem;
 }
 
 .page-title {
@@ -569,5 +654,49 @@ async function handleLogout() {
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+}
+
+@media (max-width: 900px) {
+  .main-wrapper {
+    margin-left: 0;
+  }
+
+  .sidebar {
+    width: 86vw;
+    max-width: 320px;
+    transform: translateX(-110%);
+    transition: transform var(--transition-normal);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main-header {
+    padding: 0 1rem;
+    gap: 0.75rem;
+  }
+
+  .page-title {
+    font-size: 1.05rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-actions {
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-divider,
+  .header-date {
+    display: none;
+  }
+
+  .main-content {
+    padding: 1rem;
+  }
 }
 </style>
