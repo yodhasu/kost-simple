@@ -1,13 +1,22 @@
 <template>
   <div class="dashboard">
-    <!-- Loading State -->
+    <div class="region-bar">
+      <label class="region-label">
+        <span class="material-symbols-outlined">location_on</span>
+        Region
+      </label>
+      <select v-model="selectedRegionId" class="region-select" :disabled="loadingRegions || regionOptions.length <= 1">
+        <option v-for="region in regionOptions" :key="region.id" :value="region.id">
+          {{ region.name }}
+        </option>
+      </select>
+    </div>
+
     <div v-if="loading" class="loading-overlay">
       <div class="spinner"></div>
     </div>
 
-    <!-- Main Grid -->
     <div v-if="!loading" class="dashboard-grid">
-      <!-- Chart Section -->
       <div class="chart-section card">
         <div class="chart-header">
           <div>
@@ -25,18 +34,12 @@
         </div>
       </div>
 
-      <!-- Stats Section -->
       <div class="stats-section">
         <div class="stat-card card">
           <div class="stat-row">
             <div class="stat-content">
               <p class="stat-label">Penyewa Aktif</p>
               <h3 class="stat-value">{{ stats.total_tenants }}</h3>
-              <div v-if="stats.tenant_change_percent !== null" class="stat-change positive">
-                <span class="change-arrow">↗</span>
-                <span class="change-value">{{ stats.tenant_change_percent > 0 ? '+' : '' }}{{ stats.tenant_change_percent }}%</span>
-                <span class="change-text">dari bulan lalu</span>
-              </div>
             </div>
             <div class="stat-icon blue">
               <span class="material-symbols-outlined">group</span>
@@ -69,62 +72,6 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- Status Tracker Table -->
-    <div v-if="!loading" class="tracker-section card">
-      <div class="tracker-header">
-        <h2 class="tracker-title">Status Tracker</h2>
-        <button class="view-all-btn">Lihat Semua</button>
-      </div>
-      <div class="table-wrapper">
-        <table class="tracker-table">
-          <thead>
-            <tr>
-              <th>NAMA PENYEWA</th>
-              <th>KAMAR</th>
-              <th>STATUS PEMBAYARAN</th>
-              <th>JATUH TEMPO</th>
-              <th>AKSI</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="tenant in tenants" :key="tenant.id">
-              <td>
-                <div class="tenant-cell">
-                  <div class="tenant-avatar" :class="tenant.color">
-                    {{ tenant.initials }}
-                  </div>
-                  <div class="tenant-info">
-                    <span class="tenant-name">{{ tenant.name }}</span>
-                    <span class="tenant-phone">{{ tenant.phone || '-' }}</span>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <div class="room-cell">
-                  <span class="room-number">{{ tenant.room }}</span>
-                  <span class="room-floor">{{ tenant.floor }}</span>
-                </div>
-              </td>
-              <td>
-                <span class="status-badge" :class="`status-${tenant.status.type}`">
-                  {{ tenant.status.label }}
-                </span>
-              </td>
-              <td :class="{ 'date-danger': tenant.status.type === 'danger' }">
-                {{ tenant.due_date }}
-              </td>
-              <td class="action-cell">
-                <button class="action-btn" :class="`action-${tenant.status.type}`">{{ tenant.action }}</button>
-              </td>
-            </tr>
-            <tr v-if="tenants.length === 0 && !loading">
-              <td colspan="5" class="empty-state">Belum ada data penyewa</td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
 
@@ -183,8 +130,10 @@
   </div>
 </template>
 
+
+
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -199,8 +148,9 @@ import {
 import dashboardService, {
   type DashboardStats,
   type IncomeTrendResponse,
-  type TenantTrackerItem,
 } from '../services/dashboardService'
+import regionService, { type Region } from '../../regions/services/regionService'
+import { useUserStore } from '../../../shared/stores/userStore'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler)
 
@@ -212,6 +162,10 @@ const periodOptions = [
 ]
 const selectedPeriod = ref<'month' | 'semester' | 'year'>('month')
 const loading = ref(true)
+const userStore = useUserStore()
+const regionOptions = ref<Region[]>([])
+const loadingRegions = ref(false)
+const selectedRegionId = ref<string>('')
 
 // Stats data
 const stats = ref<DashboardStats>({
@@ -229,22 +183,18 @@ const incomeTrend = ref<IncomeTrendResponse>({
   total: 0,
 })
 
-// Tenant tracker
-const tenants = ref<TenantTrackerItem[]>([])
 
 // Fetch dashboard data
 async function fetchDashboardData() {
   loading.value = true
   try {
-    const [statsData, trendData, trackerData] = await Promise.all([
-      dashboardService.getStats(),
-      dashboardService.getIncomeTrend(undefined, selectedPeriod.value),
-      dashboardService.getTenantTracker(),
+    const [statsData, trendData] = await Promise.all([
+      dashboardService.getStats(undefined, selectedRegionId.value || undefined),
+      dashboardService.getIncomeTrend(undefined, selectedPeriod.value, selectedRegionId.value || undefined),
     ])
-    
+
     stats.value = statsData
     incomeTrend.value = trendData
-    tenants.value = trackerData.items
   } catch (error) {
     console.error('Failed to fetch dashboard data:', error)
     // Use fallback mock data for demo
@@ -265,27 +215,51 @@ async function fetchDashboardData() {
       ],
       total: 70000000,
     }
-    tenants.value = [
-      { id: '1', name: 'Ahmad Dani', initials: 'AD', phone: '0812-3456-1890', room: 'A-101', floor: 'Lantai 1', status: { type: 'success', label: 'Lunas' }, due_date: '25 Okt 2023', action: 'Detail', color: 'orange' },
-      { id: '2', name: 'Citra Putri', initials: 'CP', phone: '0815-9818-3432', room: 'B-205', floor: 'Lantai 2', status: { type: 'warning', label: 'Menunggu' }, due_date: '28 Okt 2023', action: 'Ingatkan', color: 'cyan' },
-      { id: '3', name: 'Doni Setiawan', initials: 'DS', phone: '0819-1122-3344', room: 'A-105', floor: 'Lantai 1', status: { type: 'danger', label: 'Terlambat' }, due_date: '20 Okt 2023', action: 'Tagih', color: 'pink' },
-    ]
   } finally {
     loading.value = false
   }
 }
 
 onMounted(() => {
-  fetchDashboardData()
+  loadRegions().then(fetchDashboardData)
 })
 
 // Handle period change - refetch income trend only
 async function onPeriodChange() {
   try {
-    const trendData = await dashboardService.getIncomeTrend(undefined, selectedPeriod.value)
+    const trendData = await dashboardService.getIncomeTrend(
+      undefined,
+      selectedPeriod.value,
+      selectedRegionId.value || undefined
+    )
     incomeTrend.value = trendData
   } catch (error) {
     console.error('Failed to fetch income trend:', error)
+  }
+}
+
+watch(selectedRegionId, () => {
+  fetchDashboardData()
+})
+
+async function loadRegions() {
+  loadingRegions.value = true
+  try {
+    const response = await regionService.getAll(1, 100)
+    const items = response.items
+    if (userStore.userProfile?.role !== 'owner') {
+      const allowed = new Set(userStore.regionIds)
+      regionOptions.value = items.filter((r) => allowed.has(r.id))
+    } else {
+      regionOptions.value = items
+    }
+    if (!selectedRegionId.value && regionOptions.value.length > 0) {
+      selectedRegionId.value = regionOptions.value[0]!.id
+    }
+  } catch (e) {
+    console.error('Failed to load regions:', e)
+  } finally {
+    loadingRegions.value = false
   }
 }
 
@@ -350,6 +324,34 @@ const chartOptions = {
   position: relative;
 }
 
+.region-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.region-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.region-select {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+
+.region-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Loading */
 .loading-overlay {
   position: absolute;
@@ -402,7 +404,7 @@ const chartOptions = {
 /* Grid Layout */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 1fr;
   gap: 1.25rem;
 }
 
@@ -446,9 +448,9 @@ const chartOptions = {
 
 /* Stats Section */
 .stats-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
 }
 
 .stat-card {
@@ -478,23 +480,6 @@ const chartOptions = {
   color: var(--text-primary);
   line-height: 1.2;
   margin-bottom: 0.25rem;
-}
-
-.stat-change {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-}
-
-.stat-change.positive .change-arrow,
-.stat-change.positive .change-value {
-  color: var(--success);
-  font-weight: 600;
-}
-
-.stat-change .change-text {
-  color: var(--text-muted);
 }
 
 .stat-subtitle-text {
@@ -537,240 +522,9 @@ const chartOptions = {
   color: var(--red-text);
 }
 
-/* Tracker Section */
-.tracker-section {
-  overflow: hidden;
-}
-
-.tracker-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.tracker-title {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.view-all-btn {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--primary);
-}
-
-/* Table */
-.table-wrapper {
-  overflow-x: auto;
-}
-
-.tracker-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.tracker-table th,
-.tracker-table td {
-  padding: 0.875rem 1rem;
-  vertical-align: middle;
-}
-
-.tracker-table th {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.03em;
-  background: white;
-  border-bottom: 1px solid var(--border-light);
-  text-align: center;
-}
-
-.tracker-table th:first-child {
-  text-align: left;
-}
-
-.tracker-table td {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border-light);
-  text-align: center;
-}
-
-.tracker-table td:first-child {
-  text-align: left;
-}
-
-.tracker-table tr:hover {
-  background: #FAFAFA;
-}
-
-.empty-state {
-  text-align: center;
-  color: var(--text-muted);
-  padding: 2rem !important;
-}
-
-/* Tenant Cell */
-.tenant-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.tenant-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.6875rem;
-  font-weight: 700;
-}
-
-.tenant-avatar.orange {
-  background: #FED7AA;
-  color: #C2410C;
-}
-
-.tenant-avatar.cyan {
-  background: #A5F3FC;
-  color: #0E7490;
-}
-
-.tenant-avatar.pink {
-  background: #FBCFE8;
-  color: #BE185D;
-}
-
-.tenant-avatar.purple {
-  background: #E9D5FF;
-  color: #7C3AED;
-}
-
-.tenant-avatar.blue {
-  background: #BFDBFE;
-  color: #2563EB;
-}
-
-.tenant-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.tenant-name {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 0.8125rem;
-}
-
-.tenant-phone {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-/* Room Cell */
-.room-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.room-number {
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.room-floor {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-/* Status Badge */
-.status-badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.status-success {
-  background: #D1FAE5;
-  color: #059669;
-}
-
-.status-warning {
-  background: #FEF3C7;
-  color: #D97706;
-}
-
-.status-danger {
-  background: #FEE2E2;
-  color: #DC2626;
-}
-
-/* Date */
-.date-danger {
-  color: var(--danger) !important;
-  font-weight: 600;
-}
-
-/* Action Buttons */
-.action-cell {
-  text-align: center;
-}
-
-.action-btn {
-  padding: 0.375rem 0.875rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: var(--radius-sm);
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.action-btn.action-success {
-  background: #D1FAE5;
-  color: #059669;
-}
-
-.action-btn.action-success:hover {
-  background: #A7F3D0;
-}
-
-.action-btn.action-warning {
-  background: #FEF3C7;
-  color: #D97706;
-}
-
-.action-btn.action-warning:hover {
-  background: #FDE68A;
-}
-
-.action-btn.action-danger {
-  background: #FEE2E2;
-  color: #DC2626;
-}
-
-.action-btn.action-danger:hover {
-  background: #FECACA;
-}
-
 /* Responsive */
 @media (max-width: 900px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-
   .stats-section {
-    display: grid;
     grid-template-columns: repeat(3, 1fr);
   }
 }
@@ -813,53 +567,11 @@ const chartOptions = {
     display: none;
   }
 
-  .stat-change,
   .stat-subtitle-text,
   .stat-warning {
     font-size: 0.625rem;
   }
-
-  .tracker-table thead {
-    display: none;
-  }
-
-  .tracker-table,
-  .tracker-table tbody,
-  .tracker-table tr,
-  .tracker-table td {
-    display: block;
-    width: 100%;
-  }
-
-  .tracker-table tr {
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--border-light);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem 0.75rem;
-  }
-
-  .tracker-table td {
-    padding: 0;
-    border: none;
-    text-align: left;
-  }
-
-  .tracker-table td:first-child {
-    width: 100%;
-    margin-bottom: 0.25rem;
-  }
-
-  .tracker-table td:nth-child(2),
-  .tracker-table td:nth-child(3),
-  .tracker-table td:nth-child(4) {
-    width: auto;
-  }
-
-  .action-cell {
-    margin-left: auto;
-    text-align: right;
-  }
 }
 </style>
+
+

@@ -33,9 +33,9 @@ export interface KostListResponse {
 }
 
 export const kostService = {
-  async getAll(page = 1, pageSize = 100): Promise<KostListResponse> {
+  async getAll(page = 1, pageSize = 100, regionId?: string): Promise<KostListResponse> {
     const response = await httpClient.get<KostListResponse>('/kosts', {
-      params: { page, page_size: pageSize }
+      params: { page, page_size: pageSize, ...(regionId ? { region_id: regionId } : {}) }
     })
     return response.data
   },

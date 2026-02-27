@@ -43,22 +43,30 @@ export interface TenantTrackerResponse {
 }
 
 export const dashboardService = {
-  async getStats(kostId?: string): Promise<DashboardStats> {
-    const params = kostId ? { kost_id: kostId } : {}
+  async getStats(kostId?: string, regionId?: string): Promise<DashboardStats> {
+    const params: Record<string, any> = {}
+    if (kostId) params.kost_id = kostId
+    if (regionId) params.region_id = regionId
     const response = await httpClient.get('/dashboard/stats', { params })
     return response.data
   },
 
-  async getIncomeTrend(kostId?: string, period: 'month' | 'semester' | 'year' = 'month'): Promise<IncomeTrendResponse> {
+  async getIncomeTrend(
+    kostId?: string,
+    period: 'month' | 'semester' | 'year' = 'month',
+    regionId?: string
+  ): Promise<IncomeTrendResponse> {
     const params: Record<string, any> = { period }
     if (kostId) params.kost_id = kostId
+    if (regionId) params.region_id = regionId
     const response = await httpClient.get('/dashboard/income-trend', { params })
     return response.data
   },
 
-  async getTenantTracker(kostId?: string, limit = 10): Promise<TenantTrackerResponse> {
+  async getTenantTracker(kostId?: string, limit = 10, regionId?: string): Promise<TenantTrackerResponse> {
     const params: Record<string, any> = { limit }
     if (kostId) params.kost_id = kostId
+    if (regionId) params.region_id = regionId
     const response = await httpClient.get('/dashboard/tenant-tracker', { params })
     return response.data
   },

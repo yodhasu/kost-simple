@@ -153,6 +153,10 @@ const emit = defineEmits<{
   saved: []
 }>()
 
+const props = defineProps<{
+  regionId?: string
+}>()
+
 const loadingKosts = ref(false)
 const loadingTenants = ref(false)
 const saving = ref(false)
@@ -203,7 +207,7 @@ onMounted(async () => {
 async function loadKosts() {
   loadingKosts.value = true
   try {
-    const response = await kostService.getAll(1, 100)
+    const response = await kostService.getAll(1, 100, props.regionId)
     kostOptions.value = response.items
 
     // Auto-select if only one kost

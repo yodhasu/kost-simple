@@ -98,6 +98,8 @@ class TenantResponse(TenantBase):
     """Schema for tenant response."""
     id: UUID
     kost_id: UUID
+    kost_name: Optional[str] = None
+    region_name: Optional[str] = None
     end_date: Optional[date] = None
     is_active: bool = True
     created_at: datetime

@@ -33,26 +33,9 @@
 
       <!-- Navigation -->
       <nav class="nav-menu">
-        <!-- Region Selector -->
-        <div class="region-selector">
-          <label class="region-label">
-            <span class="material-symbols-outlined">location_on</span>
-            Region
-          </label>
-          <select
-            v-model="selectedRegionId"
-            class="region-select"
-            :disabled="loadingRegions || setupRequired || regions.length === 0 || !canSelectRegion || noRegionAccess"
-          >
-            <option v-if="loadingRegions" value="" disabled>Memuat...</option>
-            <option v-for="region in regions" :key="region.id" :value="region.id">
-              {{ region.name }}
-            </option>
-          </select>
-          <p v-if="setupRequired" class="setup-hint">
-            Setup awal diperlukan. Tambahkan region dan akun admin di Pengaturan.
-          </p>
-        </div>
+        <p v-if="setupRequired" class="setup-hint">
+          Setup awal diperlukan. Tambahkan region dan akun admin di Pengaturan.
+        </p>
 
         <div class="nav-divider"></div>
         
@@ -166,7 +149,6 @@ function closeSidebarIfMobile() {
 // Region selector
 const regions = ref<Region[]>([])
 const loadingRegions = ref(true)
-const selectedRegionId = ref<string>('')
 const adminCount = ref<number | null>(null)
 const loadingAdmins = ref(false)
 const setupRequired = ref(false)
@@ -187,20 +169,7 @@ async function loadRegions() {
   try {
     const response = await regionService.getAll(1, 100)
     const items = response.items
-    if (userRole.value !== 'owner') {
-      const allowed = new Set(userStore.regionIds)
-      regions.value = items.filter((r) => allowed.has(r.id))
-    } else {
-      regions.value = items
-    }
-    
-    // Set initial selected region
-    // Store already initializes from localStorage, so we just sync the UI
-    if (userStore.regionId && regions.value.find(r => r.id === userStore.regionId)) {
-      selectedRegionId.value = userStore.regionId
-    } else if (regions.value.length > 0) {
-      selectedRegionId.value = regions.value[0]!.id
-    }
+    regions.value = items
   } catch (e) {
     console.error('Failed to load regions:', e)
   } finally {
@@ -287,20 +256,6 @@ watch(
 )
 
 // Watch for region changes and update store
-watch(selectedRegionId, (newRegionId, oldRegionId) => {
-  if (newRegionId) {
-    // Update store state
-    userStore.selectedRegionId = newRegionId
-    
-    // Save to localStorage
-    localStorage.setItem('selected_region_id', newRegionId)
-    
-    // Reload page to refresh data with new region if it's not the initial load
-    if (oldRegionId) {
-      window.location.reload()
-    }
-  }
-})
 
 type NavItem = { path: string; label: string; icon: string; disabled?: boolean }
 
@@ -340,7 +295,6 @@ const currentDate = computed(() => {
   return `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`
 })
 
-const canSelectRegion = computed(() => regions.value.length > 1)
 const noRegionAccess = computed(() => {
   return userRole.value !== 'owner' && userStore.regionIds.length === 0
 })

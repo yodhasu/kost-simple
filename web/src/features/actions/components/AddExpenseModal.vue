@@ -21,12 +21,16 @@
               v-model="form.tingkat" 
               class="form-input form-select"
               required
+              :disabled="!hasRegionAccess"
               @change="onTingkatChange"
             >
               <option value="" disabled>Pilih tingkat</option>
               <option value="region">Region</option>
               <option value="kost">Kost</option>
             </select>
+            <span v-if="!hasRegionAccess" class="form-hint">
+              Anda tidak memiliki akses region untuk menambah pengeluaran.
+            </span>
           </div>
 
           <!-- Select Region (shown when tingkat is selected) -->
@@ -35,7 +39,7 @@
             <select 
               v-model="form.region_id" 
               class="form-input form-select"
-              :disabled="loadingRegions"
+              :disabled="loadingRegions || !hasRegionAccess"
               required
               @change="onRegionChange"
             >
@@ -152,15 +156,23 @@ import kostService, { type Kost } from '../../kosts/services/kostService'
 import regionService, { type Region } from '../../regions/services/regionService'
 import transactionService from '../services/transactionService'
 import { useToastStore } from '../../../shared/stores/toastStore'
+import { useUserStore } from '../../../shared/stores/userStore'
+import { useAuth } from '../../../shared/composables/useAuth'
 
 const emit = defineEmits<{
   close: []
   saved: []
 }>()
 
+const props = defineProps<{
+  regionId?: string
+}>()
+
 const saving = ref(false)
 const errorMessage = ref<string>('')
 const toast = useToastStore()
+const userStore = useUserStore()
+const { userRole } = useAuth()
 const loadingKosts = ref(false)
 const loadingRegions = ref(false)
 const kostOptions = ref<Kost[]>([])
@@ -180,6 +192,7 @@ const filteredKosts = computed(() => {
   if (!form.value.region_id) return []
   return kostOptions.value.filter(k => k.region_id === form.value.region_id)
 })
+const hasRegionAccess = computed(() => userStore.regionIds.length > 0 || userRole.value === 'owner')
 
 onMounted(async () => {
   loadRegions()
@@ -190,7 +203,18 @@ async function loadRegions() {
   loadingRegions.value = true
   try {
     const response = await regionService.getAll(1, 100)
-    regionOptions.value = response.items
+    const items = response.items
+    if (userRole.value !== 'owner') {
+      const allowed = new Set(userStore.regionIds)
+      regionOptions.value = items.filter((r) => allowed.has(r.id))
+    } else {
+      regionOptions.value = items
+    }
+    if (props.regionId && regionOptions.value.find((r) => r.id === props.regionId)) {
+      form.value.region_id = props.regionId
+    } else if (!form.value.region_id && regionOptions.value.length > 0) {
+      form.value.region_id = regionOptions.value[0]!.id
+    }
   } catch (e) {
     console.error('Failed to load regions', e)
   } finally {
@@ -220,6 +244,21 @@ function onRegionChange() {
 }
 
 async function handleSubmit() {
+  if (!hasRegionAccess.value) {
+    errorMessage.value = 'Anda tidak memiliki akses region untuk menambah pengeluaran.'
+    toast.push('warning', errorMessage.value)
+    return
+  }
+  if (!form.value.region_id) {
+    errorMessage.value = 'Pilih region terlebih dahulu.'
+    toast.push('warning', errorMessage.value)
+    return
+  }
+  if (form.value.tingkat === 'kost' && !form.value.kost_id) {
+    errorMessage.value = 'Pilih kost terlebih dahulu.'
+    toast.push('warning', errorMessage.value)
+    return
+  }
   saving.value = true
   errorMessage.value = ''
   try {

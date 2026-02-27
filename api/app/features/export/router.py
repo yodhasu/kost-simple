@@ -64,7 +64,7 @@ def auto_size_columns(ws):
 async def export_to_excel(
     start_date: date = Query(..., description="Start date for export"),
     end_date: date = Query(..., description="End date for export"),
-    data_types: List[str] = Query(..., description="Data types to export: tenants, payments, expenses, activity"),
+    data_types: List[str] = Query(..., description="Data types to export: tenants, payments, expenses"),
     region_id: Optional[UUID] = Depends(get_current_user_region),
     db: Session = Depends(get_db),
 ):
@@ -99,7 +99,8 @@ async def export_to_excel(
         elif data_type == "expenses":
             _add_expenses_sheet(wb, db, kost_ids, start_date, end_date)
         elif data_type == "activity":
-            _add_activity_sheet(wb, db, kost_ids, start_date, end_date)
+            # Activity log is no longer supported.
+            continue
     
     # If no sheets were added (invalid data types), return error
     if len(wb.worksheets) == 0:
@@ -234,44 +235,3 @@ def _add_expenses_sheet(wb: Workbook, db: Session, kost_ids: list, start_date: d
     auto_size_columns(ws)
 
 
-def _add_activity_sheet(wb: Workbook, db: Session, kost_ids: list, start_date: date, end_date: date):
-    """Add activity log sheet (all transactions combined)."""
-    ws = wb.create_sheet("Log Aktivitas")
-    
-    # Headers
-    headers = ["Tanggal", "Tipe", "Nama Kost", "Penyewa", "Kategori", "Jumlah", "Keterangan"]
-    ws.append(headers)
-    style_header_row(ws)
-    
-    # Query all transactions
-    query = db.query(Transaction).filter(
-        Transaction.transaction_date >= start_date,
-        Transaction.transaction_date <= end_date,
-    )
-    if kost_ids:
-        query = query.filter(Transaction.kost_id.in_(kost_ids))
-    
-    transactions = query.order_by(Transaction.transaction_date.desc()).all()
-    
-    for tx in transactions:
-        tenant_name = "-"
-        if tx.tenant_id:
-            tenant = db.query(Tenant).filter(Tenant.id == tx.tenant_id).first()
-            tenant_name = tenant.name if tenant else "-"
-        
-        kost = db.query(Kost).filter(Kost.id == tx.kost_id).first()
-        kost_name = kost.name if kost else "-"
-        
-        type_label = "Pemasukan" if tx.type == "income" else "Pengeluaran"
-        
-        ws.append([
-            tx.transaction_date.strftime("%d/%m/%Y"),
-            type_label,
-            kost_name,
-            tenant_name,
-            tx.category or "-",
-            float(tx.amount),
-            tx.description or "-",
-        ])
-    
-    auto_size_columns(ws)

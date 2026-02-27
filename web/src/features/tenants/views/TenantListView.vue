@@ -6,6 +6,12 @@
         <h1 class="page-title">Daftar Penyewa</h1>
       </div>
       <div class="header-actions">
+        <select v-model="selectedRegionId" class="region-select" :disabled="loadingRegions">
+          <option value="">Semua Region</option>
+          <option v-for="region in regionOptions" :key="region.id" :value="region.id">
+            {{ region.name }}
+          </option>
+        </select>
         <button class="btn-filter" @click="showFilters = !showFilters">
           <span class="material-symbols-outlined">filter_list</span>
           Filter
@@ -59,6 +65,8 @@
           <tr>
             <th>NAMA PENYEWA</th>
             <th>NOMOR HP</th>
+            <th>KOST</th>
+            <th>REGION</th>
             <th>TANGGAL MASUK</th>
             <th>TOTAL BIAYA</th>
             <th>STATUS</th>
@@ -78,6 +86,8 @@
               </div>
             </td>
             <td>{{ tenant.phone || '-' }}</td>
+            <td>{{ tenant.kost_name || '-' }}</td>
+            <td>{{ tenant.region_name || '-' }}</td>
             <td>{{ formatDate(tenant.start_date) }}</td>
             <td>{{ formatCurrency(getTotalFee(tenant)) }}</td>
             <td>
@@ -93,7 +103,7 @@
             </td>
           </tr>
           <tr v-if="tenants.length === 0">
-            <td colspan="6" class="empty-state">Belum ada data penyewa</td>
+            <td colspan="8" class="empty-state">Belum ada data penyewa</td>
           </tr>
         </tbody>
       </table>
@@ -136,6 +146,7 @@
       v-if="showModal"
       :tenant="selectedTenant"
       :kost-id="currentKostId"
+      :region-id="selectedRegionId"
       @close="closeModal"
       @saved="onTenantSaved"
     />
@@ -170,13 +181,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import tenantService, { type Tenant } from '../services/tenantService'
 import TenantFormModal from '../components/TenantFormModal.vue'
 import TenantDetailModal from '../components/TenantDetailModal.vue'
 import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import { useToastStore } from '../../../shared/stores/toastStore'
 import kostService from '../../kosts/services/kostService'
+import regionService, { type Region } from '../../regions/services/regionService'
+import { useUserStore } from '../../../shared/stores/userStore'
 
 // State
 const loading = ref(true)
@@ -185,7 +198,7 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const searchQuery = ref('')
-const showFilters = ref(false)
+const showFilters = ref(true)
 const statusFilter = ref('')
 const showModal = ref(false)
 const showDeleteConfirm = ref(false)
@@ -195,6 +208,10 @@ const showDetailModal = ref(false)
 const selectedDetailId = ref('')
 const confirmMode = ref<'delete' | 'inactive'>('delete')
 const toast = useToastStore()
+const userStore = useUserStore()
+const regionOptions = ref<Region[]>([])
+const loadingRegions = ref(false)
+const selectedRegionId = ref<string>('')
 
 // TODO: Get from current user context/store
 const currentKostId = ref<string>('')
@@ -226,6 +243,7 @@ async function fetchTenants() {
   try {
     const response = await tenantService.getAll({
       kost_id: currentKostId.value || undefined,
+      region_id: selectedRegionId.value || undefined,
       search: searchQuery.value || undefined,
       status: (statusFilter.value || undefined) as any,
       page: currentPage.value,
@@ -298,7 +316,7 @@ function closeModal() {
 
 async function checkKostAvailability(onReady: (hasKost: boolean) => void) {
   try {
-    const response = await kostService.getAll(1, 1)
+    const response = await kostService.getAll(1, 1, selectedRegionId.value || undefined)
     if ((response.total ?? 0) === 0) {
       toast.push('warning', 'Kost belum ada, silahkan tambahkan kost terlebih dahulu.')
       onReady(false)
@@ -412,8 +430,30 @@ function getStatusLabel(status: string): string {
 }
 
 onMounted(() => {
+  loadRegions().then(fetchTenants)
+})
+
+watch(selectedRegionId, () => {
+  currentPage.value = 1
   fetchTenants()
 })
+
+async function loadRegions() {
+  loadingRegions.value = true
+  try {
+    const response = await regionService.getAll(1, 100)
+    const items = response.items
+    const allowed = new Set(userStore.regionIds)
+    regionOptions.value = items.filter((r) => allowed.has(r.id))
+    if (selectedRegionId.value && !allowed.has(selectedRegionId.value)) {
+      selectedRegionId.value = ''
+    }
+  } catch (e) {
+    console.error('Failed to load regions:', e)
+  } finally {
+    loadingRegions.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -439,6 +479,20 @@ onMounted(() => {
 .header-actions {
   display: flex;
   gap: 0.75rem;
+}
+
+.region-select {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+  color: var(--text-secondary);
+}
+
+.region-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-filter,
@@ -652,7 +706,8 @@ onMounted(() => {
 
   .tenant-table td:nth-child(2),
   .tenant-table td:nth-child(3),
-  .tenant-table td:nth-child(4) {
+  .tenant-table td:nth-child(4),
+  .tenant-table td:nth-child(5) {
     width: 100%;
   }
 
@@ -664,26 +719,40 @@ onMounted(() => {
   }
 
   .tenant-table td:nth-child(3)::before {
-    content: "Masuk: ";
+    content: "Kost: ";
     font-weight: 600;
     color: var(--text-muted);
     font-size: 0.75rem;
   }
 
   .tenant-table td:nth-child(4)::before {
+    content: "Region: ";
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .tenant-table td:nth-child(5)::before {
+    content: "Masuk: ";
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .tenant-table td:nth-child(6)::before {
     content: "Biaya: ";
     font-weight: 600;
     color: var(--text-muted);
     font-size: 0.75rem;
   }
 
-  .tenant-table td:nth-child(5) {
+  .tenant-table td:nth-child(6) {
     width: auto;
     display: inline-flex;
     align-items: center;
   }
 
-  .tenant-table td:nth-child(6) {
+  .tenant-table td:nth-child(7) {
     width: auto;
     margin-left: auto;
   }

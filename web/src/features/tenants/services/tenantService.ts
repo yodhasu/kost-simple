@@ -3,6 +3,8 @@ import httpClient from '../../../shared/utils/api/httpClient'
 export interface Tenant {
   id: string
   kost_id: string
+  kost_name?: string | null
+  region_name?: string | null
   name: string
   phone: string | null
   start_date: string | null
@@ -71,6 +73,7 @@ export interface TenantDetail extends Tenant {
 export const tenantService = {
   async getAll(params: {
     kost_id?: string
+    region_id?: string
     search?: string
     status?: Tenant['status']
     page?: number

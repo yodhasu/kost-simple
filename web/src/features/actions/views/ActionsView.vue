@@ -221,6 +221,7 @@ async function checkKostAvailability(): Promise<boolean> {
     return false
   }
 }
+
 </script>
 
 <style scoped>
@@ -229,6 +230,7 @@ async function checkKostAvailability(): Promise<boolean> {
   flex-direction: column;
   align-items: center;
   padding: 2rem 1rem;
+  gap: 1rem;
 }
 
 /* Grid */

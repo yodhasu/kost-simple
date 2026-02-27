@@ -29,16 +29,8 @@ httpClient.interceptors.request.use(
  * Setup interceptors that depend on the User Store.
  * Call this from main.ts after store initialization.
  */
-export function setupAxiosInterceptors(userStore: any) {
-  httpClient.interceptors.request.use((config) => {
-    if (userStore.regionId) {
-      config.params = { 
-        ...config.params, 
-        region_id: userStore.regionId 
-      }
-    }
-    return config
-  })
+export function setupAxiosInterceptors(_userStore: any) {
+  // No-op: region scoping is handled per-feature to avoid global/local conflicts.
 }
 
 // Response interceptor

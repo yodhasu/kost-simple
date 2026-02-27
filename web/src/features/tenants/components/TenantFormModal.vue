@@ -203,6 +203,7 @@ import { useToastStore } from '../../../shared/stores/toastStore'
 const props = defineProps<{
   tenant: Tenant | null
   kostId?: string // Optional now, as user can select
+  regionId?: string
 }>()
 
 const emit = defineEmits<{
@@ -299,7 +300,7 @@ async function loadKosts() {
   loadingKosts.value = true
   try {
     // This endpoint is already filtered by region in backend based on user token
-    const response = await kostService.getAll(1, 100)
+    const response = await kostService.getAll(1, 100, props.regionId)
     kostOptions.value = response.items
     
     // Auto-select if only one kost and no selection yet

@@ -20,7 +20,6 @@ export const useUserStore = defineStore('user', {
   state: () => ({
     user: null as User | null,
     userProfile: null as UserProfile | null,
-    selectedRegionId: localStorage.getItem('selected_region_id') as string | null,
     loading: true,
     error: null as string | null,
     _authInitialized: false,
@@ -29,7 +28,7 @@ export const useUserStore = defineStore('user', {
   getters: {
     isAuthenticated: (state) => !!state.user,
     // Use selected region (owner override) OR assigned region
-    regionId: (state) => state.selectedRegionId || state.userProfile?.region_ids?.[0] || null,
+    regionId: (state) => state.userProfile?.region_ids?.[0] || null,
     regionIds: (state) => state.userProfile?.region_ids || [],
     userEmail: (state) => state.user?.email ?? '',
     userDisplayName: (state) => state.userProfile?.name ?? state.user?.displayName ?? 'User',

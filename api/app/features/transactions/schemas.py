@@ -21,7 +21,7 @@ class TransactionBase(BaseModel):
 class TransactionResponse(TransactionBase):
     """Schema for transaction response."""
     id: UUID
-    kost_id: UUID
+    kost_id: Optional[UUID] = None
     tenant_id: Optional[UUID] = None
     region_id: Optional[UUID] = None
     created_at: datetime

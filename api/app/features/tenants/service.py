@@ -16,6 +16,7 @@ from app.features.tenants.model import Tenant
 from app.features.tenants.schemas import TenantCreate, TenantUpdate
 from app.features.kosts.model import Kost
 from app.features.transactions.model import Transaction
+from app.features.regions.model import Regions
 
 
 class TenantsService:
@@ -66,6 +67,23 @@ class TenantsService:
         setattr(tenant, "dp_amount", dp_amount)
         setattr(tenant, "dp_due_date", dp_due_date)
         return tenant
+
+    def _attach_kost_region_fields(self, tenants: list[Tenant]) -> list[Tenant]:
+        if not tenants:
+            return tenants
+        kost_ids = {t.kost_id for t in tenants if t.kost_id}
+        kosts = self.db.query(Kost).filter(Kost.id.in_(kost_ids)).all()
+        kost_map = {k.id: k for k in kosts}
+        region_ids = {k.region_id for k in kosts if k.region_id}
+        regions = self.db.query(Regions).filter(Regions.id.in_(region_ids)).all()
+        region_map = {r.id: r for r in regions}
+
+        for tenant in tenants:
+            kost = kost_map.get(tenant.kost_id)
+            region = region_map.get(kost.region_id) if kost else None
+            setattr(tenant, "kost_name", kost.name if kost else None)
+            setattr(tenant, "region_name", region.name if region else None)
+        return tenants
 
     def get_all(
         self, 
@@ -119,6 +137,7 @@ class TenantsService:
         )
 
         items = [self._attach_dp_fields(item) for item in items]
+        items = self._attach_kost_region_fields(items)
         return items, total
 
     def get_by_id(self, tenant_id: UUID) -> Tenant:
@@ -127,7 +146,9 @@ class TenantsService:
         
         if not tenant:
             raise NotFoundException(f"Tenant with id {tenant_id} not found")
-        return self._attach_dp_fields(tenant)
+        tenant = self._attach_dp_fields(tenant)
+        self._attach_kost_region_fields([tenant])
+        return tenant
 
     def create(self, data: TenantCreate) -> Tenant:
         """Create new tenant and optionally record initial payment transaction."""
@@ -176,14 +197,19 @@ class TenantsService:
         kost = kost or self.db.query(Kost).filter(Kost.id == tenant.kost_id).first()
 
         if tenant.status == "dp" and dp_amount and dp_amount > 0:
+            extra_fees = (
+                (tenant.trash_fee or 0)
+                + (tenant.security_fee or 0)
+                + (tenant.admin_fee or 0)
+            )
             transaction = Transaction(
                 kost_id=tenant.kost_id,
                 tenant_id=tenant.id,
                 type="income",
                 category="dp",
-                amount=dp_amount,
+                amount=dp_amount + extra_fees,
                 transaction_date=tenant.start_date or date.today(),
-                description=f"Pembayaran DP penyewa {tenant.name} due_date:{dp_due_date.isoformat()}",
+                description=f"Pembayaran DP penyewa {tenant.name} (termasuk biaya lain) due_date:{dp_due_date.isoformat()}",
                 region_id=kost.region_id if kost else None,
             )
             self.db.add(transaction)
@@ -260,18 +286,28 @@ class TenantsService:
                 )
 
             if dp_tx:
-                dp_tx.amount = effective_dp_amount
-                dp_tx.description = f"Pembayaran DP penyewa {tenant.name} due_date:{effective_due_date.isoformat()}"
+                extra_fees = (
+                    (tenant.trash_fee or 0)
+                    + (tenant.security_fee or 0)
+                    + (tenant.admin_fee or 0)
+                )
+                dp_tx.amount = effective_dp_amount + extra_fees
+                dp_tx.description = f"Pembayaran DP penyewa {tenant.name} (termasuk biaya lain) due_date:{effective_due_date.isoformat()}"
             else:
+                extra_fees = (
+                    (tenant.trash_fee or 0)
+                    + (tenant.security_fee or 0)
+                    + (tenant.admin_fee or 0)
+                )
                 self.db.add(
                     Transaction(
                         kost_id=tenant.kost_id,
                         tenant_id=tenant.id,
                         type="income",
                         category="dp",
-                        amount=effective_dp_amount,
+                        amount=effective_dp_amount + extra_fees,
                         transaction_date=tenant.start_date or date.today(),
-                        description=f"Pembayaran DP penyewa {tenant.name} due_date:{effective_due_date.isoformat()}",
+                        description=f"Pembayaran DP penyewa {tenant.name} (termasuk biaya lain) due_date:{effective_due_date.isoformat()}",
                         region_id=kost.region_id if kost else None,
                     )
                 )

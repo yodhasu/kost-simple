@@ -55,6 +55,15 @@
             <span class="column-title">Jenis Data</span>
           </div>
 
+          <div class="form-group">
+            <label class="form-label">Region</label>
+            <select v-model="selectedRegionId" class="form-input">
+              <option v-for="region in regionOptions" :key="region.id" :value="region.id">
+                {{ region.name }}
+              </option>
+            </select>
+          </div>
+
           <div class="checkbox-list">
             <label class="checkbox-item">
               <input type="checkbox" v-model="form.data_types" value="tenants" />
@@ -71,10 +80,6 @@
               <span class="checkbox-label">Laporan Pengeluaran</span>
             </label>
 
-            <label class="checkbox-item">
-              <input type="checkbox" v-model="form.data_types" value="activity" />
-              <span class="checkbox-label">Log Aktivitas</span>
-            </label>
           </div>
 
           <button class="btn-download" :disabled="!canExport" @click="handleExport">
@@ -89,9 +94,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import httpClient from '../../../shared/utils/api/httpClient'
 import { useToastStore } from '../../../shared/stores/toastStore'
+import regionService, { type Region } from '../../regions/services/regionService'
+import { useUserStore } from '../../../shared/stores/userStore'
 
 const form = ref({
   start_date: '',
@@ -102,6 +109,9 @@ const form = ref({
 const exporting = ref(false)
 const errorMessage = ref<string>('')
 const toast = useToastStore()
+const userStore = useUserStore()
+const regionOptions = ref<Region[]>([])
+const selectedRegionId = ref<string>('')
 
 const dateRangeError = computed(() => {
   if (!form.value.start_date || !form.value.end_date) return ''
@@ -131,6 +141,9 @@ async function handleExport() {
     const params = new URLSearchParams()
     params.append('start_date', form.value.start_date)
     params.append('end_date', form.value.end_date)
+    if (selectedRegionId.value) {
+      params.append('region_id', selectedRegionId.value)
+    }
     form.value.data_types.forEach(dt => params.append('data_types', dt))
     
     // Request the Excel file
@@ -169,6 +182,28 @@ async function handleExport() {
     toast.push('error', errorMessage.value)
   } finally {
     exporting.value = false
+  }
+}
+
+onMounted(() => {
+  loadRegions()
+})
+
+async function loadRegions() {
+  try {
+    const response = await regionService.getAll(1, 100)
+    const items = response.items
+    if (userStore.userProfile?.role !== 'owner') {
+      const allowed = new Set(userStore.regionIds)
+      regionOptions.value = items.filter((r) => allowed.has(r.id))
+    } else {
+      regionOptions.value = items
+    }
+    if (!selectedRegionId.value && regionOptions.value.length > 0) {
+      selectedRegionId.value = regionOptions.value[0]!.id
+    }
+  } catch (e) {
+    console.error('Failed to load regions:', e)
   }
 }
 </script>
