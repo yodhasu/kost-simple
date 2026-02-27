@@ -176,6 +176,7 @@ import TenantFormModal from '../components/TenantFormModal.vue'
 import TenantDetailModal from '../components/TenantDetailModal.vue'
 import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import { useToastStore } from '../../../shared/stores/toastStore'
+import kostService from '../../kosts/services/kostService'
 
 // State
 const loading = ref(true)
@@ -260,8 +261,11 @@ function goToPage(page: number) {
 }
 
 function openAddModal() {
-  selectedTenant.value = null
-  showModal.value = true
+  checkKostAvailability(async (hasKost) => {
+    if (!hasKost) return
+    selectedTenant.value = null
+    showModal.value = true
+  })
 }
 
 function openDetailModal(tenant: Tenant) {
@@ -290,6 +294,21 @@ function openEditModal(tenant: Tenant) {
 function closeModal() {
   showModal.value = false
   selectedTenant.value = null
+}
+
+async function checkKostAvailability(onReady: (hasKost: boolean) => void) {
+  try {
+    const response = await kostService.getAll(1, 1)
+    if ((response.total ?? 0) === 0) {
+      toast.push('warning', 'Kost belum ada, silahkan tambahkan kost terlebih dahulu.')
+      onReady(false)
+      return
+    }
+    onReady(true)
+  } catch (e) {
+    toast.push('warning', 'Kost belum ada, silahkan tambahkan kost terlebih dahulu.')
+    onReady(false)
+  }
 }
 
 function onTenantSaved() {

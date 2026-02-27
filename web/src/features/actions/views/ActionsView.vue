@@ -108,6 +108,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../../../shared/composables/useAuth'
+import { useToastStore } from '../../../shared/stores/toastStore'
 import TenantFormModal from '../../tenants/components/TenantFormModal.vue'
 import UpdatePaymentModal from '../components/UpdatePaymentModal.vue'
 import AddExpenseModal from '../components/AddExpenseModal.vue'
@@ -125,9 +126,12 @@ const showKostSelectModal = ref(false)
 const selectedKost = ref<Kost | null>(null)
 const kostList = ref<Kost[]>([])
 const loadingKosts = ref(false)
+const toast = useToastStore()
 
 // Methods
-function handleAddTenant() {
+async function handleAddTenant() {
+  const hasKost = await checkKostAvailability()
+  if (!hasKost) return
   showAddModal.value = true
 }
 
@@ -202,6 +206,20 @@ function onKostDeleted() {
 
 function handleExportData() {
   router.push('/export')
+}
+
+async function checkKostAvailability(): Promise<boolean> {
+  try {
+    const response = await kostService.getAll(1, 1)
+    if ((response.total ?? 0) === 0) {
+      toast.push('warning', 'Kost belum ada, silahkan tambahkan kost terlebih dahulu.')
+      return false
+    }
+    return true
+  } catch (e) {
+    toast.push('warning', 'Kost belum ada, silahkan tambahkan kost terlebih dahulu.')
+    return false
+  }
 }
 </script>
 

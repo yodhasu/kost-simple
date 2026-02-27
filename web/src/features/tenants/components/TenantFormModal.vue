@@ -44,10 +44,76 @@
                 />
                 <p v-if="phoneError" class="form-error">{{ phoneError }}</p>
               </div>
+
+              <div class="form-group">
+                <label class="form-label">Pilih Kost <span class="required">*</span></label>
+                <select 
+                  v-model="form.kost_id" 
+                  class="form-input form-select"
+                  :disabled="loadingKosts || (!!props.kostId && !isEdit)"
+                  required
+                >
+                  <option value="" disabled>Pilih Kost</option>
+                  <option v-for="kost in kostOptions" :key="kost.id" :value="kost.id">
+                    {{ kost.name }}
+                  </option>
+                </select>
+                <p v-if="capacityLoading" class="form-hint">Memuat kapasitas kost...</p>
+                <p v-else-if="capacityTotal !== null" class="form-hint">
+                  Terisi {{ effectiveActiveCount }}/{{ capacityTotal }} kamar
+                </p>
+                <p v-if="capacityError" class="form-error">{{ capacityError }}</p>
+                <p v-if="isCapacityFull && (form.status === 'aktif' || form.status === 'dp')" class="form-error">
+                  Kost sudah penuh. Silakan pilih kost lain.
+                </p>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Tanggal Masuk <span class="required">*</span></label>
+                <input 
+                  v-model="form.start_date" 
+                  type="date" 
+                  class="form-input"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Status <span class="required">*</span></label>
+                <select v-model="form.status" class="form-input form-select">
+                  <option value="aktif">Aktif</option>
+                  <option value="dp">DP</option>
+                </select>
+              </div>
+
+              <div v-if="form.status === 'dp'" class="form-group">
+                <label class="form-label">Nominal DP</label>
+                <div class="input-with-prefix">
+                  <span class="input-prefix">Rp</span>
+                  <input
+                    v-model.number="form.dp_amount"
+                    type="number"
+                    class="form-input"
+                    placeholder="0"
+                    min="0"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div v-if="form.status === 'dp'" class="form-group">
+                <label class="form-label">Batas Pelunasan</label>
+                <input
+                  v-model="form.dp_due_date"
+                  type="date"
+                  class="form-input"
+                  required
+                />
+              </div>
             </div>
 
-            <!-- div3: Rincian Biaya (bottom-left) -->
-            <div class="grid-div3">
+            <!-- div2: Rincian Biaya (right column) -->
+            <div class="grid-div2">
               <div class="biaya-box">
                 <div class="section-header">
                   <span class="material-symbols-outlined section-icon">payments</span>
@@ -112,77 +178,11 @@
               </div>
             </div>
 
-            <!-- div2: Detail Sewa (right column) -->
-            <div class="grid-div2">
-              <div class="section-header">
-                <span class="material-symbols-outlined section-icon">home</span>
-                <h3 class="section-title">Detail Sewa</h3>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Pilih Kost <span class="required">*</span></label>
-                <select 
-                  v-model="form.kost_id" 
-                  class="form-input form-select"
-                  :disabled="loadingKosts || (!!props.kostId && !isEdit)"
-                  required
-                >
-                  <option value="" disabled>Pilih Kost</option>
-                  <option v-for="kost in kostOptions" :key="kost.id" :value="kost.id">
-                    {{ kost.name }}
-                  </option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Tanggal Masuk <span class="required">*</span></label>
-                <input 
-                  v-model="form.start_date" 
-                  type="date" 
-                  class="form-input"
-                  required
-                />
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Status <span class="required">*</span></label>
-                <select v-model="form.status" class="form-input form-select">
-                  <option value="aktif">Aktif</option>
-                  <option value="dp">DP</option>
-                </select>
-              </div>
-
-              <div v-if="form.status === 'dp'" class="form-group">
-                <label class="form-label">Nominal DP</label>
-                <div class="input-with-prefix">
-                  <span class="input-prefix">Rp</span>
-                  <input
-                    v-model.number="form.dp_amount"
-                    type="number"
-                    class="form-input"
-                    placeholder="0"
-                    min="0"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div v-if="form.status === 'dp'" class="form-group">
-                <label class="form-label">Batas Pelunasan</label>
-                <input
-                  v-model="form.dp_due_date"
-                  type="date"
-                  class="form-input"
-                  required
-                />
-              </div>
-            </div>
-
             <!-- div4: Actions (bottom-right) -->
             <div class="grid-div4"> 
               <p v-if="errorMessage" class="form-error form-error-global">{{ errorMessage }}</p>
               <button type="button" class="btn-action-cancel" @click="$emit('close')">Batal</button>
-              <button type="submit" class="btn-submit" :disabled="saving">
+              <button type="submit" class="btn-submit" :disabled="isSubmitDisabled">
                 <span class="material-symbols-outlined">save</span>
                 {{ saving ? 'Menyimpan...' : 'Simpan' }}
               </button>
@@ -194,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import tenantService, { type Tenant, type TenantCreate, type TenantUpdate } from '../services/tenantService'
 import kostService, { type Kost } from '../../kosts/services/kostService'
@@ -216,6 +216,10 @@ const errorMessage = ref<string>('')
 const toast = useToastStore()
 const kostOptions = ref<Kost[]>([])
 const loadingKosts = ref(false)
+const capacityTotal = ref<number | null>(null)
+const capacityActiveCount = ref(0)
+const capacityLoading = ref(false)
+const capacityError = ref('')
 
 const form = ref({
   kost_id: '',
@@ -243,6 +247,15 @@ const phoneError = computed(() => {
   if (digits.length < 10 || digits.length > 15) return 'Nomor HP harus 10-15 digit.'
   return ''
 })
+const effectiveActiveCount = computed(() => capacityActiveCount.value)
+const isCapacityFull = computed(() => {
+  if (capacityTotal.value === null) return false
+  return effectiveActiveCount.value >= capacityTotal.value
+})
+const isSubmitDisabled = computed(() => {
+  const statusNeedsCapacity = form.value.status === 'aktif' || form.value.status === 'dp'
+  return saving.value || (statusNeedsCapacity && isCapacityFull.value)
+})
 
 onMounted(async () => {
   // Load kost options
@@ -269,6 +282,19 @@ onMounted(async () => {
   }
 })
 
+watch(
+  () => form.value.kost_id,
+  (kostId) => {
+    if (kostId) {
+      loadCapacity(kostId)
+    } else {
+      capacityTotal.value = null
+      capacityActiveCount.value = 0
+      capacityError.value = ''
+    }
+  }
+)
+
 async function loadKosts() {
   loadingKosts.value = true
   try {
@@ -288,10 +314,45 @@ async function loadKosts() {
   }
 }
 
+async function loadCapacity(kostId: string) {
+  capacityLoading.value = true
+  capacityError.value = ''
+  try {
+    const [kost, aktif, dp] = await Promise.all([
+      kostService.getById(kostId),
+      tenantService.getAll({ kost_id: kostId, status: 'aktif', page: 1, page_size: 1 }),
+      tenantService.getAll({ kost_id: kostId, status: 'dp', page: 1, page_size: 1 }),
+    ])
+    capacityTotal.value = kost.total_units ?? 0
+    let activeCount = (aktif.total || 0) + (dp.total || 0)
+    if (
+      isEdit.value &&
+      props.tenant &&
+      props.tenant.kost_id === kostId &&
+      ['aktif', 'dp'].includes(props.tenant.status) &&
+      props.tenant.is_active
+    ) {
+      activeCount = Math.max(0, activeCount - 1)
+    }
+    capacityActiveCount.value = activeCount
+  } catch (e) {
+    capacityError.value = 'Gagal memuat kapasitas kost.'
+    capacityTotal.value = null
+    capacityActiveCount.value = 0
+  } finally {
+    capacityLoading.value = false
+  }
+}
+
 async function handleSubmit() {
   errorMessage.value = ''
   if (!form.value.kost_id) {
     errorMessage.value = 'Silakan pilih Kost terlebih dahulu.'
+    toast.push('error', errorMessage.value)
+    return
+  }
+  if (isCapacityFull.value && (form.value.status === 'aktif' || form.value.status === 'dp')) {
+    errorMessage.value = 'Kost sudah penuh. Silakan pilih kost lain.'
     toast.push('error', errorMessage.value)
     return
   }
@@ -442,32 +503,27 @@ async function handleSubmit() {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: auto auto auto auto auto;
+  grid-template-columns: repeat(2, 1fr);
   grid-column-gap: 1.5rem;
-  grid-row-gap: 0;
+  grid-row-gap: 1.5rem;
 }
 
 .grid-div1 { 
-  grid-area: 1 / 1 / 3 / 3;
+  grid-column: 1 / 2;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
 
-.grid-div3 { 
-  grid-area: 3 / 1 / 6 / 3;
-}
-
 .grid-div2 { 
-  grid-area: 1 / 3 / 5 / 5;
+  grid-column: 2 / 3;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
 
 .grid-div4 { 
-  grid-area: 5 / 3 / 6 / 5;
+  grid-column: 1 / -1;
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
@@ -480,7 +536,6 @@ async function handleSubmit() {
     grid-template-columns: 1fr;
   }
   .grid-div1 { grid-area: auto; }
-  .grid-div3 { grid-area: auto; }
   .grid-div2 { grid-area: auto; }
   .grid-div4 { grid-area: auto; }
 }
@@ -535,6 +590,12 @@ async function handleSubmit() {
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-secondary);
+}
+
+.form-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
 }
 
 .required {

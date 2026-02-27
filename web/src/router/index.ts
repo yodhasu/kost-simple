@@ -69,14 +69,24 @@ router.beforeEach(async (to, _from, next) => {
   if (loading.value) {
     await initAuth()
   }
+
+  if (to.name === 'login') {
+    if (isAuthenticated.value) {
+      next({ path: '/' })
+    } else {
+      next()
+    }
+    return
+  }
   
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth !== false)
   
   if (requiresAuth && !isAuthenticated.value) {
-    next({ name: 'unauthorized', query: { redirect: to.fullPath } })
-  } else if (to.name === 'login' && isAuthenticated.value) {
-    // Already logged in, redirect to home
-    next({ path: '/' })
+    if (to.path === '/' || to.name === 'dashboard') {
+      next({ name: 'login' })
+    } else {
+      next({ name: 'unauthorized', query: { redirect: to.fullPath } })
+    }
   } else if (to.name === 'unauthorized' && isAuthenticated.value) {
     const redirect = (to.query.redirect as string) || '/'
     next({ path: redirect })

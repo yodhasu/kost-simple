@@ -46,6 +46,15 @@ httpClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
+      const path = window.location.pathname
+      if (path === '/login' || path === '/unauthorized') {
+        return Promise.reject(error)
+      }
+      // If user already logged out, go to login instead of unauthorized
+      if (!auth.currentUser) {
+        window.location.href = '/login'
+        return Promise.reject(error)
+      }
       // Token expired or invalid. Show guardrail page (user can go to login).
       const redirect = encodeURIComponent(`${window.location.pathname}${window.location.search}`)
       window.location.href = `/unauthorized?redirect=${redirect}`

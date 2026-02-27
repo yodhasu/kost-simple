@@ -13,7 +13,7 @@ export interface UserProfile {
   firebase_uid: string
   name: string
   role: string
-  region_id: string | null
+  region_ids: string[]
 }
 
 export const useUserStore = defineStore('user', {
@@ -29,7 +29,8 @@ export const useUserStore = defineStore('user', {
   getters: {
     isAuthenticated: (state) => !!state.user,
     // Use selected region (owner override) OR assigned region
-    regionId: (state) => state.selectedRegionId || state.userProfile?.region_id || null,
+    regionId: (state) => state.selectedRegionId || state.userProfile?.region_ids?.[0] || null,
+    regionIds: (state) => state.userProfile?.region_ids || [],
     userEmail: (state) => state.user?.email ?? '',
     userDisplayName: (state) => state.userProfile?.name ?? state.user?.displayName ?? 'User',
     userRole: (state) => state.userProfile?.role ?? '',

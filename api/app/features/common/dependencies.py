@@ -27,8 +27,8 @@ async def get_current_user_region(
         - If query param region_id is provided, use it.
         - If not provided, return None (implies all regions or no filter).
     - If user is NOT OWNER:
-        - Must use the first region_id from user_regions table.
-        - Query param region_id is ignored (for security).
+        - If query param region_id is provided and assigned to the user, use it.
+        - Otherwise, fall back to the first assigned region_id.
     """
     user_service = UserProfileService(db)
     profile = user_service.get_by_firebase_uid(firebase_uid)
@@ -42,10 +42,13 @@ async def get_current_user_region(
     if profile.role == "owner":
         # Owner can override region via query param
         return region_id
-    
-    # Non-owners: get their assigned region from user_regions table
-    user_region = db.query(UserRegion).filter(
+
+    assigned_regions = db.query(UserRegion.region_id).filter(
         UserRegion.user_id == profile.id
-    ).first()
-    
-    return user_region.region_id if user_region else None
+    ).all()
+    assigned_ids = [r.region_id for r in assigned_regions]
+    if not assigned_ids:
+        return None
+    if region_id and region_id in assigned_ids:
+        return region_id
+    return assigned_ids[0]

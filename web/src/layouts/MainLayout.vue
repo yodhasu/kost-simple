@@ -1,11 +1,22 @@
 <template>
   <div class="layout" :class="{ 'is-mobile': isMobile, 'sidebar-open': sidebarOpen }">
-    <div
-      v-if="isMobile && sidebarOpen"
-      class="sidebar-backdrop"
-      aria-hidden="true"
-      @click="closeSidebar"
-    />
+      <div
+        v-if="isMobile && sidebarOpen"
+        class="sidebar-backdrop"
+        aria-hidden="true"
+        @click="closeSidebar"
+      />
+      <div v-if="noRegionAccess" class="access-backdrop" aria-hidden="true"></div>
+      <div v-if="noRegionAccess" class="access-modal" role="dialog" aria-modal="true">
+        <div class="access-card">
+          <div class="access-icon">
+            <span class="material-symbols-outlined">lock</span>
+          </div>
+          <h2>Akses Ditolak</h2>
+          <p>Anda tidak diberkan akses ke region manapun, silagkan minta dari owner kost.</p>
+          <button class="access-logout" type="button" @click="handleLogout">Keluar</button>
+        </div>
+      </div>
     <!-- Sidebar -->
     <aside id="app-sidebar" class="sidebar" :class="{ open: sidebarOpen }" :aria-hidden="isMobile && !sidebarOpen">
       <!-- User Profile -->
@@ -23,7 +34,7 @@
       <!-- Navigation -->
       <nav class="nav-menu">
         <!-- Region Selector -->
-        <div class="region-selector" v-if="userRole === 'owner'">
+        <div class="region-selector">
           <label class="region-label">
             <span class="material-symbols-outlined">location_on</span>
             Region
@@ -31,7 +42,7 @@
           <select
             v-model="selectedRegionId"
             class="region-select"
-            :disabled="loadingRegions || setupRequired || regions.length === 0"
+            :disabled="loadingRegions || setupRequired || regions.length === 0 || !canSelectRegion || noRegionAccess"
           >
             <option v-if="loadingRegions" value="" disabled>Memuat...</option>
             <option v-for="region in regions" :key="region.id" :value="region.id">
@@ -175,7 +186,13 @@ async function loadRegions() {
   loadingRegions.value = true
   try {
     const response = await regionService.getAll(1, 100)
-    regions.value = response.items
+    const items = response.items
+    if (userRole.value !== 'owner') {
+      const allowed = new Set(userStore.regionIds)
+      regions.value = items.filter((r) => allowed.has(r.id))
+    } else {
+      regions.value = items
+    }
     
     // Set initial selected region
     // Store already initializes from localStorage, so we just sync the UI
@@ -225,11 +242,13 @@ async function checkOwnerSetup() {
 watch(
   () => userRole.value,
   async (role) => {
+    await loadRegions()
     if (role === 'owner') {
       await checkOwnerSetup()
       window.addEventListener('focus', checkOwnerSetup)
       window.addEventListener('setup-changed', checkOwnerSetup as any)
     } else {
+      setupRequired.value = false
       window.removeEventListener('focus', checkOwnerSetup)
       window.removeEventListener('setup-changed', checkOwnerSetup as any)
     }
@@ -254,7 +273,7 @@ watch(
   () => route.path,
   async (path) => {
     closeSidebarIfMobile()
-    if (userRole.value !== 'owner') return
+  if (userRole.value !== 'owner') return
     if (setupRequired.value && path !== '/settings') {
       router.replace('/settings')
       return
@@ -301,6 +320,10 @@ const navItems = computed<NavItem[]>(() => {
   if (userRole.value === 'owner' && setupRequired.value) {
     return items.map((it) => (it.path === '/settings' ? it : { ...it, disabled: true }))
   }
+
+  if (noRegionAccess.value) {
+    return items.map((it) => ({ ...it, disabled: true }))
+  }
   
   return items
 })
@@ -315,6 +338,11 @@ const currentDate = computed(() => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
   const now = new Date()
   return `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`
+})
+
+const canSelectRegion = computed(() => regions.value.length > 1)
+const noRegionAccess = computed(() => {
+  return userRole.value !== 'owner' && userStore.regionIds.length === 0
 })
 
 // Get user initials for avatar
@@ -362,6 +390,76 @@ async function handleLogout() {
   inset: 0;
   background: rgba(17, 24, 39, 0.5);
   z-index: 90;
+}
+
+.access-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(6px);
+  z-index: 150;
+}
+
+.access-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.access-card {
+  width: min(520px, 100%);
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.access-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #111827;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.access-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.access-card p {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.access-logout {
+  margin-top: 1.25rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  border: none;
+  background: #ef4444;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.access-logout:hover {
+  background: #dc2626;
 }
 
 /* User Profile */

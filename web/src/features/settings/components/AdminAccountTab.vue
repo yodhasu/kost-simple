@@ -184,6 +184,7 @@ import { onMounted, ref } from 'vue'
 import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import regionService, { type Region } from '../../regions/services/regionService'
 import adminAccountService, { type AdminAccount } from '../services/adminAccountService'
+import { useToastStore } from '../../../shared/stores/toastStore'
 
 const loading = ref(true)
 const saving = ref(false)
@@ -194,6 +195,7 @@ const showManageModal = ref(false)
 const savingManage = ref(false)
 const selectedAccount = ref<AdminAccount | null>(null)
 const manageRegionIds = ref<string[]>([])
+const toast = useToastStore()
 
 const createForm = ref({
   name: '',
@@ -214,7 +216,7 @@ async function loadAccounts() {
     accounts.value = response.items
   } catch (error) {
     console.error('Failed to load admin accounts:', error)
-    alert('Gagal memuat akun admin')
+    toast.push('error', 'Gagal memuat akun admin')
   } finally {
     loading.value = false
   }
@@ -258,7 +260,7 @@ function closeManageModal() {
 
 async function submitCreate() {
   if (createForm.value.region_ids.length === 0) {
-    alert('Pilih minimal satu region')
+    toast.push('warning', 'Pilih minimal satu region')
     return
   }
   saving.value = true
@@ -269,7 +271,7 @@ async function submitCreate() {
     closeCreateModal()
   } catch (error: any) {
     console.error('Failed to create account:', error)
-    alert(error?.response?.data?.detail || 'Gagal menambahkan akun')
+    toast.push('error', error?.response?.data?.detail || 'Gagal menambahkan akun')
   } finally {
     saving.value = false
   }
@@ -282,7 +284,7 @@ async function handleResetPassword(userId: string) {
     window.location.href = response.reset_link
   } catch (error: any) {
     console.error('Failed to reset password:', error)
-    alert(error?.response?.data?.detail || 'Gagal membuat reset password link')
+    toast.push('error', error?.response?.data?.detail || 'Gagal membuat reset password link')
   }
 }
 
@@ -290,7 +292,7 @@ async function submitManage() {
   if (!selectedAccount.value) return
   const uniqueRegionIds = [...new Set(manageRegionIds.value.filter(Boolean))]
   if (uniqueRegionIds.length === 0) {
-    alert('Pilih minimal satu region')
+    toast.push('warning', 'Pilih minimal satu region')
     return
   }
   savingManage.value = true
@@ -301,7 +303,7 @@ async function submitManage() {
     closeManageModal()
   } catch (error: any) {
     console.error('Failed to update admin regions:', error)
-    alert(error?.response?.data?.detail || 'Gagal menyimpan perubahan')
+    toast.push('error', error?.response?.data?.detail || 'Gagal menyimpan perubahan')
   } finally {
     savingManage.value = false
   }
@@ -316,7 +318,7 @@ async function confirmDelete(userId: string, name: string) {
     window.dispatchEvent(new Event('setup-changed'))
   } catch (error: any) {
     console.error('Failed to delete account:', error)
-    alert(error?.response?.data?.detail || 'Gagal menghapus akun')
+    toast.push('error', error?.response?.data?.detail || 'Gagal menghapus akun')
   }
 }
 

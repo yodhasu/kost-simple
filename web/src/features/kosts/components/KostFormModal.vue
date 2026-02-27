@@ -61,9 +61,14 @@
               type="number" 
               class="form-input"
               placeholder="10"
-              min="1"
+              :min="minUnits"
               required
             />
+            <p v-if="isEditMode && activeTenantCount !== null" class="form-hint">
+              Penyewa aktif saat ini: {{ activeTenantCount }}
+            </p>
+            <p v-if="activeTenantError" class="form-error">{{ activeTenantError }}</p>
+            <p v-if="unitError" class="form-error">{{ unitError }}</p>
           </div>
 
           <!-- Catatan -->
@@ -82,7 +87,12 @@
               <span class="material-symbols-outlined">delete</span>
               {{ deleting ? 'Menghapus...' : 'Hapus Kost' }}
             </button>
-            <p class="danger-hint">Tindakan ini akan menghapus kost. Pastikan Anda yakin.</p>
+            <p class="danger-hint">
+              {{ hasActiveTenants
+                ? 'Kost masih memiliki penyewa aktif dan tidak bisa dihapus.'
+                : 'Tindakan ini akan menghapus kost. Pastikan Anda yakin.'
+              }}
+            </p>
           </div>
 
           <!-- Actions -->
@@ -103,8 +113,10 @@ import { ref, computed, onMounted } from 'vue'
 import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import kostService, { type Kost } from '../services/kostService'
 import regionService, { type Region } from '../../regions/services/regionService'
+import tenantService from '../../tenants/services/tenantService'
 import { useUserStore } from '../../../shared/stores/userStore'
 import { useAuth } from '../../../shared/composables/useAuth'
+import { useToastStore } from '../../../shared/stores/toastStore'
 
 const props = defineProps<{
   kost?: Kost | null
@@ -118,14 +130,29 @@ const emit = defineEmits<{
 
 const userStore = useUserStore()
 const { userRole } = useAuth()
+const toast = useToastStore()
 const saving = ref(false)
 const deleting = ref(false)
 const loadingRegions = ref(false)
 const regions = ref<Region[]>([])
 const selectedRegionId = ref('')
+const activeTenantCount = ref<number | null>(null)
+const activeTenantError = ref('')
 
 const isEditMode = computed(() => !!props.kost)
 const isOwner = computed(() => userRole.value === 'owner')
+const hasActiveTenants = computed(() => (activeTenantCount.value ?? 0) > 0)
+const minUnits = computed(() => {
+  if (!isEditMode.value || activeTenantCount.value === null) return 1
+  return Math.max(activeTenantCount.value, 1)
+})
+const unitError = computed(() => {
+  if (!isEditMode.value || activeTenantCount.value === null) return ''
+  if (form.value.total_units < activeTenantCount.value) {
+    return `Jumlah unit tidak boleh kurang dari jumlah penyewa aktif (${activeTenantCount.value}).`
+  }
+  return ''
+})
 
 const form = ref({
   name: '',
@@ -142,6 +169,7 @@ onMounted(async () => {
       total_units: props.kost.total_units,
       notes: props.kost.notes || '',
     }
+    await loadActiveTenantCount()
   }
 
   // Load regions for owner
@@ -166,7 +194,26 @@ onMounted(async () => {
   }
 })
 
+async function loadActiveTenantCount() {
+  if (!props.kost) return
+  activeTenantError.value = ''
+  try {
+    const [aktif, dp] = await Promise.all([
+      tenantService.getAll({ kost_id: props.kost.id, status: 'aktif', page: 1, page_size: 1 }),
+      tenantService.getAll({ kost_id: props.kost.id, status: 'dp', page: 1, page_size: 1 }),
+    ])
+    activeTenantCount.value = (aktif.total || 0) + (dp.total || 0)
+  } catch (e) {
+    activeTenantError.value = 'Gagal memuat jumlah penyewa aktif.'
+    activeTenantCount.value = null
+  }
+}
+
 async function handleSubmit() {
+  if (unitError.value) {
+    toast.push('warning', unitError.value)
+    return
+  }
   saving.value = true
   try {
     if (isEditMode.value && props.kost) {
@@ -181,7 +228,7 @@ async function handleSubmit() {
       // Create new kost
       const regionId = isOwner.value ? selectedRegionId.value : userStore.regionId
       if (!regionId) {
-        alert('Region ID tidak ditemukan. Silakan login ulang.')
+        toast.push('error', 'Region ID tidak ditemukan. Silakan login ulang.')
         return
       }
 
@@ -197,7 +244,7 @@ async function handleSubmit() {
     emit('saved')
   } catch (error) {
     console.error('Failed to save kost:', error)
-    alert('Gagal menyimpan kost')
+    toast.push('error', 'Gagal menyimpan kost')
   } finally {
     saving.value = false
   }
@@ -205,7 +252,12 @@ async function handleSubmit() {
 
 async function handleDelete() {
   if (!props.kost) return
-  if (!confirm(`Apakah Anda yakin ingin menghapus kost "${props.kost.name}"?`)) return
+  if (hasActiveTenants.value) {
+    toast.push('warning', 'Kost masih memiliki penyewa aktif dan tidak bisa dihapus.')
+    return
+  }
+  const confirmMessage = `Apakah Anda yakin ingin menghapus kost "${props.kost.name}"?`
+  if (!confirm(confirmMessage)) return
 
   deleting.value = true
   try {
@@ -213,7 +265,7 @@ async function handleDelete() {
     emit('deleted')
   } catch (error) {
     console.error('Failed to delete kost:', error)
-    alert('Gagal menghapus kost')
+    toast.push('error', 'Gagal menghapus kost')
   } finally {
     deleting.value = false
   }
@@ -303,6 +355,18 @@ async function handleDelete() {
 
 .required {
   color: #ef4444;
+}
+
+.form-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.form-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: #dc2626;
 }
 
 .form-input {

@@ -98,12 +98,14 @@
 import { ref, onMounted } from 'vue'
 import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import regionService, { type Region } from '../../regions/services/regionService'
+import { useToastStore } from '../../../shared/stores/toastStore'
 
 const regions = ref<Region[]>([])
 const loading = ref(true)
 const saving = ref(false)
 const showModal = ref(false)
 const editingRegion = ref<Region | null>(null)
+const toast = useToastStore()
 
 const form = ref({
   name: ''
@@ -157,7 +159,7 @@ async function handleSubmit() {
     closeModal()
   } catch (error) {
     console.error('Failed to save region:', error)
-    alert('Gagal menyimpan region')
+    toast.push('error', 'Gagal menyimpan region')
   } finally {
     saving.value = false
   }
@@ -172,7 +174,7 @@ async function confirmDelete(region: Region) {
     window.dispatchEvent(new Event('setup-changed'))
   } catch (error) {
     console.error('Failed to delete region:', error)
-    alert('Gagal menghapus region')
+    toast.push('error', 'Gagal menghapus region')
   }
 }
 </script>

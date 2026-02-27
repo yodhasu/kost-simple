@@ -184,6 +184,7 @@
 import { ref, onMounted, computed } from 'vue'
 import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import tenantService, { type TenantDetail } from '../services/tenantService'
+import { useToastStore } from '../../../shared/stores/toastStore'
 
 const props = defineProps<{
   tenantId: string
@@ -201,6 +202,7 @@ const showStatusModal = ref(false)
 const savingStatus = ref(false)
 const nextStatus = ref<'aktif' | 'pindah' | 'renovasi' | ''>('')
 const showTransactionsModal = ref(false)
+const toast = useToastStore()
 
 const statusOptions = [
   { value: 'renovasi', label: 'Renovasi' },
@@ -324,7 +326,7 @@ async function submitStatusChange() {
     closeStatusModal()
   } catch (e) {
     console.error('Failed to update tenant status', e)
-    alert('Gagal mengubah status penyewa')
+    toast.push('error', 'Gagal mengubah status penyewa')
   } finally {
     savingStatus.value = false
   }

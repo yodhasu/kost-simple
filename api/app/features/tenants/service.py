@@ -24,6 +24,16 @@ class TenantsService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _count_active_tenants(self, kost_id: UUID, exclude_tenant_id: Optional[UUID] = None) -> int:
+        query = self.db.query(func.count(Tenant.id)).filter(
+            Tenant.kost_id == kost_id,
+            Tenant.is_active == True,
+            Tenant.status.in_(["aktif", "dp"]),
+        )
+        if exclude_tenant_id:
+            query = query.filter(Tenant.id != exclude_tenant_id)
+        return query.scalar() or 0
+
     @staticmethod
     def _extract_due_date_from_description(description: Optional[str]) -> Optional[date]:
         if not description:
@@ -125,6 +135,12 @@ class TenantsService:
         dp_amount = payload.pop("dp_amount", None)
         dp_due_date = payload.pop("dp_due_date", None)
 
+        if not payload.get("kost_id"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="kost_id is required",
+            )
+
         if payload.get("status") == "dp":
             if dp_amount is None or dp_amount <= 0:
                 raise HTTPException(
@@ -137,6 +153,18 @@ class TenantsService:
                     detail="dp_due_date is required when status is DP",
                 )
 
+        kost = self.db.query(Kost).filter(Kost.id == payload.get("kost_id")).first()
+        if not kost:
+            raise NotFoundException("Kost not found")
+
+        if payload.get("status") in ("aktif", "dp"):
+            active_count = self._count_active_tenants(kost.id)
+            if active_count >= kost.total_units:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Kost sudah penuh ({active_count}/{kost.total_units}).",
+                )
+
         tenant = Tenant(**payload)
         self.db.add(tenant)
 
@@ -145,7 +173,7 @@ class TenantsService:
 
         # Auto-create initial income transaction if tenant has non-zero payable amount.
         # This keeps tenant creation and initial payment history in sync.
-        kost = self.db.query(Kost).filter(Kost.id == tenant.kost_id).first()
+        kost = kost or self.db.query(Kost).filter(Kost.id == tenant.kost_id).first()
 
         if tenant.status == "dp" and dp_amount and dp_amount > 0:
             transaction = Transaction(
@@ -193,6 +221,16 @@ class TenantsService:
 
         for key, value in update_data.items():
             setattr(tenant, key, value)
+
+        if tenant.is_active and tenant.status in ("aktif", "dp"):
+            kost = self.db.query(Kost).filter(Kost.id == tenant.kost_id).first()
+            if kost:
+                active_count = self._count_active_tenants(kost.id, exclude_tenant_id=tenant.id)
+                if active_count >= kost.total_units:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Kost sudah penuh ({active_count}/{kost.total_units}).",
+                    )
 
         # If tenant is in DP state and DP metadata is provided, upsert DP transaction metadata.
         if tenant.status == "dp" and (dp_amount is not None or dp_due_date is not None):
