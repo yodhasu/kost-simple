@@ -202,7 +202,7 @@ onMounted(async () => {
 async function loadRegions() {
   loadingRegions.value = true
   try {
-    const response = await regionService.getAll(1, 100)
+    const response = await regionService.getAll()
     const items = response.items
     if (userRole.value !== 'owner') {
       const allowed = new Set(userStore.regionIds)
@@ -225,7 +225,7 @@ async function loadRegions() {
 async function loadKosts() {
   loadingKosts.value = true
   try {
-    const response = await kostService.getAll(1, 100)
+    const response = await kostService.getAll()
     kostOptions.value = response.items
   } catch (e) {
     console.error('Failed to load kosts', e)

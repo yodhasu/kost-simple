@@ -103,13 +103,26 @@
             </td>
           </tr>
           <tr v-if="tenants.length === 0">
-            <td colspan="8" class="empty-state">Belum ada data penyewa</td>
+            <td colspan="8" class="empty-state">
+              <div class="empty-state-content">
+                <span class="material-symbols-outlined empty-state-icon">person</span>
+                <span class="empty-state-text">Belum ada data penyewa</span>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
 
       <!-- Pagination -->
-      <div class="pagination" v-if="totalPages > 1">
+      <div class="pagination" v-if="total > 0">
+        <div class="page-size">
+          <label>Per halaman</label>
+          <select v-model.number="pageSize" @change="onPageSizeChange">
+            <option :value="10">10</option>
+            <option :value="25">25</option>
+            <option :value="50">50</option>
+          </select>
+        </div>
         <span class="pagination-info">
           Menampilkan {{ startItem }} sampai {{ endItem }} dari {{ total }} hasil
         </span>
@@ -278,6 +291,11 @@ function goToPage(page: number) {
   fetchTenants()
 }
 
+function onPageSizeChange() {
+  currentPage.value = 1
+  fetchTenants()
+}
+
 function openAddModal() {
   checkKostAvailability(async (hasKost) => {
     if (!hasKost) return
@@ -441,7 +459,7 @@ watch(selectedRegionId, () => {
 async function loadRegions() {
   loadingRegions.value = true
   try {
-    const response = await regionService.getAll(1, 100)
+    const response = await regionService.getAll()
     const items = response.items
     const allowed = new Set(userStore.regionIds)
     regionOptions.value = items.filter((r) => allowed.has(r.id))
@@ -766,6 +784,10 @@ async function loadRegions() {
   .pagination-info {
     font-size: 0.75rem;
   }
+
+  .page-size {
+    font-size: 0.75rem;
+  }
 }
 
 .tenant-table th {
@@ -880,6 +902,26 @@ async function loadRegions() {
   padding: 3rem !important;
 }
 
+.empty-state-content {
+  width: 100%;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  color: var(--text-muted);
+}
+
+.empty-state-text {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
 /* Pagination */
 .pagination {
   display: flex;
@@ -887,11 +929,33 @@ async function loadRegions() {
   justify-content: space-between;
   padding: 1rem 1.25rem;
   border-top: 1px solid var(--border-light);
+  gap: 1rem;
 }
 
 .pagination-info {
   font-size: 0.8125rem;
   color: var(--text-muted);
+}
+
+.page-size {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.page-size label {
+  font-weight: 600;
+}
+
+.page-size select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
 }
 
 .pagination-controls {

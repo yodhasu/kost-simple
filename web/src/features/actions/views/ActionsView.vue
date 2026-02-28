@@ -81,6 +81,15 @@
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
+      <div class="select-filters">
+        <label class="filter-label">Region</label>
+        <select v-model="selectedRegionId" class="filter-select" :disabled="loadingRegions">
+          <option value="">Semua Region</option>
+          <option v-for="region in regionOptions" :key="region.id" :value="region.id">
+            {{ region.name }}
+          </option>
+        </select>
+      </div>
       <div class="select-body">
         <div v-if="loadingKosts" class="loading">Memuat...</div>
         <div v-else-if="kostList.length === 0" class="empty">Tidak ada kost tersedia</div>
@@ -105,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../../../shared/composables/useAuth'
 import { useToastStore } from '../../../shared/stores/toastStore'
@@ -115,6 +124,8 @@ import AddExpenseModal from '../components/AddExpenseModal.vue'
 import KostFormModal from '../../kosts/components/KostFormModal.vue'
 import kostService, { type Kost } from '../../kosts/services/kostService'
 import BaseModal from '../../../shared/components/base/BaseModal.vue'
+import regionService, { type Region } from '../../regions/services/regionService'
+import { useUserStore } from '../../../shared/stores/userStore'
 
 const router = useRouter()
 const { userRole } = useAuth()
@@ -127,6 +138,10 @@ const selectedKost = ref<Kost | null>(null)
 const kostList = ref<Kost[]>([])
 const loadingKosts = ref(false)
 const toast = useToastStore()
+const userStore = useUserStore()
+const regionOptions = ref<Region[]>([])
+const loadingRegions = ref(false)
+const selectedRegionId = ref<string>('')
 
 // Methods
 async function handleAddTenant() {
@@ -176,7 +191,8 @@ async function handleEditKost() {
   loadingKosts.value = true
   showKostSelectModal.value = true
   try {
-    const response = await kostService.getAll(1, 100)
+    await loadRegions()
+    const response = await kostService.getAll(1, 100, selectedRegionId.value || undefined)
     kostList.value = response.items
   } catch (e) {
     console.error('Failed to load kosts', e)
@@ -210,7 +226,7 @@ function handleExportData() {
 
 async function checkKostAvailability(): Promise<boolean> {
   try {
-    const response = await kostService.getAll(1, 1)
+    const response = await kostService.getAll()
     if ((response.total ?? 0) === 0) {
       toast.push('warning', 'Kost belum ada, silahkan tambahkan kost terlebih dahulu.')
       return false
@@ -221,6 +237,36 @@ async function checkKostAvailability(): Promise<boolean> {
     return false
   }
 }
+
+async function loadRegions() {
+  loadingRegions.value = true
+  try {
+    const response = await regionService.getAll()
+    const items = response.items
+    const allowed = new Set(userStore.regionIds)
+    regionOptions.value = items.filter((r) => allowed.has(r.id))
+    if (selectedRegionId.value && !allowed.has(selectedRegionId.value)) {
+      selectedRegionId.value = ''
+    }
+  } catch (e) {
+    console.error('Failed to load regions:', e)
+  } finally {
+    loadingRegions.value = false
+  }
+}
+
+watch(selectedRegionId, async () => {
+  if (!showKostSelectModal.value) return
+  loadingKosts.value = true
+  try {
+    const response = await kostService.getAll(1, 100, selectedRegionId.value || undefined)
+    kostList.value = response.items
+  } catch (e) {
+    console.error('Failed to load kosts', e)
+  } finally {
+    loadingKosts.value = false
+  }
+})
 
 </script>
 
@@ -349,7 +395,7 @@ async function checkKostAvailability(): Promise<boolean> {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.25rem 0 1rem;
+  padding: 0 0 0.75rem;
   border-bottom: 1px solid var(--border-light, #e5e7eb);
 }
 
@@ -375,9 +421,37 @@ async function checkKostAvailability(): Promise<boolean> {
 }
 
 .select-body {
-  padding: 1rem 0 0;
+  padding: 0.75rem 0 0;
   max-height: 55vh;
   overflow-y: auto;
+}
+
+.select-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0 0;
+}
+
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filter-select {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+
+.filter-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .loading, .empty {

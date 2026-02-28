@@ -1,8 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import MainLayout from '../layouts/MainLayout.vue'
 import { useAuth } from '../shared/composables/useAuth'
-import regionService from '../features/regions/services/regionService'
-import adminAccountService from '../features/settings/services/adminAccountService'
 import UnauthorizedView from '../shared/views/UnauthorizedView.vue'
 import ForbiddenView from '../shared/views/ForbiddenView.vue'
 import NotFoundView from '../shared/views/NotFoundView.vue'
@@ -91,28 +89,6 @@ router.beforeEach(async (to, _from, next) => {
     const redirect = (to.query.redirect as string) || '/'
     next({ path: redirect })
   } else {
-    // Owner setup guard: require at least 1 region and 1 admin/it account.
-    const { userRole } = useAuth()
-    const isOwner = userRole.value === 'owner'
-    const allowWhenSetupMissing = to.path === '/settings' || to.name === 'forbidden' || to.name === 'not-found'
-
-    if (isAuthenticated.value && isOwner && !allowWhenSetupMissing) {
-      try {
-        const [regions, admins] = await Promise.all([
-          regionService.getAll(1, 1),
-          adminAccountService.getAll(),
-        ])
-        const regionsEmpty = (regions.total ?? 0) === 0
-        const adminsEmpty = (admins.items?.length ?? 0) === 0
-        if (regionsEmpty || adminsEmpty) {
-          next({ path: '/settings', query: { setup: '1' } })
-          return
-        }
-      } catch {
-        // If the check fails (network/API), don't hard-lock the user.
-      }
-    }
-
     next()
   }
 })

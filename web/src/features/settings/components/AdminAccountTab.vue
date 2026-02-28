@@ -224,7 +224,7 @@ async function loadAccounts() {
 
 async function loadRegions() {
   try {
-    const response = await regionService.getAll(1, 100)
+    const response = await regionService.getAll()
     regions.value = response.items
   } catch (error) {
     console.error('Failed to load regions:', error)

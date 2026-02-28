@@ -2,7 +2,7 @@
 Regions router - API endpoints.
 """
 
-from fastapi import APIRouter, Query, status, Depends
+from fastapi import APIRouter, status, Depends
 from uuid import UUID
 
 from app.features.regions.schemas import (
@@ -28,15 +28,13 @@ async def get_current_user_profile(db: Session = Depends(get_db), firebase_uid: 
 
 @router.get("", response_model=RegionsListResponse)
 async def get_regions(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user_profile),
 ):
-    """Get paginated list of regions."""
+    """Get list of regions."""
     service = RegionsService(db)
-    items, total = service.get_all(page=page, page_size=page_size)
-    return RegionsListResponse(items=items, total=total, page=page, page_size=page_size)
+    items = service.get_all()
+    return RegionsListResponse(items=items)
 
 @router.post("", response_model=RegionsResponse, status_code=status.HTTP_201_CREATED)
 async def create_region(data: RegionsCreate, db: Session = Depends(get_db)):

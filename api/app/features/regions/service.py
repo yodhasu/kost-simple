@@ -19,17 +19,11 @@ class RegionsService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, page: int = 1, page_size: int = 10) -> tuple[List[Regions], int]:
-        """Get paginated list."""
+    def get_all(self) -> List[Regions]:
+        """Get all regions."""
         query = self.db.query(Regions)
-        total = query.count()
-        items = (
-            query.order_by(Regions.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-            .all()
-        )
-        return items, total
+        items = query.order_by(Regions.created_at.desc()).all()
+        return items
 
     def get_by_id(self, item_id: UUID) -> Regions:
         """Get by ID."""

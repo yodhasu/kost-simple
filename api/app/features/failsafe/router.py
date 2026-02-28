@@ -7,12 +7,46 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_firebase_uid
 from app.db.session import get_db
-from app.features.failsafe.schemas import FailsafeResponse
+from app.features.failsafe.schemas import FailsafeResponse, SetupCheckResponse
 from app.features.regions.model import Regions
 from app.features.users.model import UserProfile
 from app.features.users.user_region_model import UserRegion
 
 router = APIRouter()
+
+
+@router.get("/setup-check", response_model=SetupCheckResponse)
+async def setup_check(
+    firebase_uid: str = Depends(get_current_firebase_uid),
+    db: Session = Depends(get_db),
+):
+    """
+    Lightweight setup check:
+    - At least one region exists
+    - At least one admin/it account exists
+    """
+    caller = db.query(UserProfile).filter(UserProfile.firebase_uid == firebase_uid).first()
+    if not caller:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User profile not found.")
+    if caller.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner can run setup check.")
+
+    regions_total = db.query(Regions).count()
+    admins_total = (
+        db.query(UserProfile)
+        .filter(UserProfile.role.in_(["admin", "it"]))
+        .count()
+    )
+    regions_empty = regions_total == 0
+    admins_empty = admins_total == 0
+
+    return SetupCheckResponse(
+        regions_total=regions_total,
+        admins_total=admins_total,
+        regions_empty=regions_empty,
+        admins_empty=admins_empty,
+        setup_complete=not regions_empty and not admins_empty,
+    )
 
 
 @router.post("", response_model=FailsafeResponse)
@@ -66,4 +100,3 @@ async def failsafe(
         owner_region_assignments_after=after,
         owner_region_assignments_added=added,
     )
-

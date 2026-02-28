@@ -15,3 +15,10 @@ class FailsafeResponse(BaseModel):
     owner_region_assignments_after: int
     owner_region_assignments_added: int
 
+
+class SetupCheckResponse(BaseModel):
+    regions_total: int
+    admins_total: int
+    regions_empty: bool
+    admins_empty: bool
+    setup_complete: bool

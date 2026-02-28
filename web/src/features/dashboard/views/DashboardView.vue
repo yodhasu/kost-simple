@@ -245,7 +245,7 @@ watch(selectedRegionId, () => {
 async function loadRegions() {
   loadingRegions.value = true
   try {
-    const response = await regionService.getAll(1, 100)
+    const response = await regionService.getAll()
     const items = response.items
     if (userStore.userProfile?.role !== 'owner') {
       const allowed = new Set(userStore.regionIds)

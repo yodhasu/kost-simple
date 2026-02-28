@@ -34,7 +34,7 @@ class KostUpdate(BaseModel):
 class KostResponse(KostBase):
     """Schema for kost response."""
     id: UUID
-    region_id: UUID
+    region_id: Optional[UUID] = None
     created_at: datetime
 
     class Config:

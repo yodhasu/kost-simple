@@ -8,16 +8,11 @@ export interface Region {
 
 export interface RegionListResponse {
   items: Region[]
-  total: number
-  page: number
-  page_size: number
 }
 
 const regionService = {
-  async getAll(page = 1, page_size = 100): Promise<RegionListResponse> {
-    const response = await httpClient.get<RegionListResponse>('/regions', {
-      params: { page, page_size },
-    })
+  async getAll(): Promise<RegionListResponse> {
+    const response = await httpClient.get<RegionListResponse>('/regions')
     return response.data
   },
 

@@ -114,9 +114,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '../shared/composables/useAuth'
 import { useUserStore } from '../shared/stores/userStore'
-import regionService, { type Region } from '../features/regions/services/regionService'
 import ToastContainer from '../shared/components/base/ToastContainer.vue'
-import adminAccountService from '../features/settings/services/adminAccountService'
 
 const route = useRoute()
 const router = useRouter()
@@ -146,12 +144,7 @@ function closeSidebarIfMobile() {
   if (isMobile.value) closeSidebar()
 }
 
-// Region selector
-const regions = ref<Region[]>([])
-const loadingRegions = ref(true)
-const adminCount = ref<number | null>(null)
-const loadingAdmins = ref(false)
-const setupRequired = ref(false)
+const setupRequired = computed(() => userStore.setupRequired)
 
 onMounted(async () => {
   // Setup check runs via watch(userRole) below (needs role info).
@@ -164,71 +157,18 @@ onMounted(async () => {
   }
 })
 
-async function loadRegions() {
-  loadingRegions.value = true
-  try {
-    const response = await regionService.getAll(1, 100)
-    const items = response.items
-    regions.value = items
-  } catch (e) {
-    console.error('Failed to load regions:', e)
-  } finally {
-    loadingRegions.value = false
-  }
-}
-
-async function loadAdminAccounts() {
-  loadingAdmins.value = true
-  try {
-    const response = await adminAccountService.getAll()
-    adminCount.value = response.items.length
-  } catch (e) {
-    console.error('Failed to load admin accounts:', e)
-    adminCount.value = null
-  } finally {
-    loadingAdmins.value = false
-  }
-}
-
-async function checkOwnerSetup() {
-  if (userRole.value !== 'owner') {
-    setupRequired.value = false
-    return
-  }
-
-  await Promise.all([loadRegions(), loadAdminAccounts()])
-
-  const regionsEmpty = regions.value.length === 0
-  const adminsEmpty = (adminCount.value ?? 0) === 0
-  setupRequired.value = regionsEmpty || adminsEmpty
-
-  if (setupRequired.value && route.path !== '/settings') {
-    router.replace('/settings')
-  }
-}
-
-// Run setup checks once role is known and occasionally when coming back to the tab.
+// Run setup checks once role is known (setup check runs on login only).
 watch(
   () => userRole.value,
   async (role) => {
-    await loadRegions()
-    if (role === 'owner') {
-      await checkOwnerSetup()
-      window.addEventListener('focus', checkOwnerSetup)
-      window.addEventListener('setup-changed', checkOwnerSetup as any)
-    } else {
-      setupRequired.value = false
-      window.removeEventListener('focus', checkOwnerSetup)
-      window.removeEventListener('setup-changed', checkOwnerSetup as any)
+    if (role === 'owner' && setupRequired.value && route.path !== '/settings') {
+      router.replace('/settings')
     }
   },
   { immediate: true },
 )
 
 onBeforeUnmount(() => {
-  window.removeEventListener('focus', checkOwnerSetup)
-  window.removeEventListener('setup-changed', checkOwnerSetup as any)
-
   if (mobileMediaQuery) {
     if (typeof (mobileMediaQuery as any).removeEventListener === 'function') {
       mobileMediaQuery.removeEventListener('change', syncIsMobile)
@@ -242,15 +182,10 @@ watch(
   () => route.path,
   async (path) => {
     closeSidebarIfMobile()
-  if (userRole.value !== 'owner') return
+    if (userRole.value !== 'owner') return
     if (setupRequired.value && path !== '/settings') {
       router.replace('/settings')
       return
-    }
-    // After owner finishes setup, leaving Settings should re-check.
-    // This avoids requiring a full reload to unlock navigation.
-    if (path !== '/settings') {
-      await checkOwnerSetup()
     }
   },
 )

@@ -36,8 +36,5 @@ class RegionsResponse(RegionsBase):
 
 
 class RegionsListResponse(BaseModel):
-    """Schema for paginated regions list."""
+    """Schema for regions list."""
     items: list[RegionsResponse]
-    total: int
-    page: int
-    page_size: int
