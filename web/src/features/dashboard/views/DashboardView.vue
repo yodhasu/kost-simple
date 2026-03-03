@@ -78,7 +78,6 @@
             <div class="stat-content">
               <p class="stat-label">Kamar Kosong</p>
               <h3 class="stat-value">{{ stats.empty_rooms }}</h3>
-              <p class="stat-warning">{{ 100 - stats.occupancy_rate }}% tingkat hunian rendah</p>
             </div>
             <div class="stat-icon red">
               <span class="material-symbols-outlined">door_front</span>
@@ -137,6 +136,7 @@ import {
   Title,
   Tooltip,
 } from 'chart.js'
+import type { ChartOptions } from 'chart.js'
 import dashboardService, {
   type DashboardStats,
   type IncomeTrendResponse,
@@ -316,13 +316,13 @@ const chartData = computed(() => {
   }
 })
 
-const chartOptions = {
+const chartOptions: ChartOptions<'bar'> = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
     legend: { display: false },
     tooltip: {
-      mode: 'index',
+      mode: 'index' as const,
       intersect: false,
       callbacks: {
         label: (context: any) => {
