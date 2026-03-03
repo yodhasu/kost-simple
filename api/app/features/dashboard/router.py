@@ -13,6 +13,7 @@ from app.core.auth import get_current_firebase_uid
 from app.features.users.service import UserProfileService
 from app.features.dashboard.schemas import (
     DashboardStats,
+    DashboardSummaryResponse,
     IncomeTrendResponse,
     TrendBarResponse,
     TenantTrackerResponse,
@@ -36,6 +37,17 @@ async def get_dashboard_stats(
     # If kost_id is provided, it overrides region filtering in the service logic (or refines it)
     # But for "collective data", we pass region_id mainy.
     return service.get_stats(kost_id=kost_id, region_id=region_id)
+
+
+@router.get("/summary", response_model=DashboardSummaryResponse)
+async def get_dashboard_summary(
+    kost_id: Optional[UUID] = Query(None, description="Filter by kost ID"),
+    region_id: Optional[UUID] = Depends(get_current_user_region),
+    db: Session = Depends(get_db),
+):
+    """Get bundled dashboard data."""
+    service = DashboardService(db)
+    return service.get_summary(kost_id=kost_id, region_id=region_id)
 
 
 @router.get("/income-trend", response_model=IncomeTrendResponse)

@@ -31,6 +31,13 @@ export interface TrendBarResponse {
   items: TrendBarItem[]
 }
 
+export interface DashboardSummaryResponse {
+  stats: DashboardStats
+  trend_bars: TrendBarResponse
+  dp_total: number
+  dp_count: number
+}
+
 export interface TenantPaymentStatus {
   type: 'success' | 'warning' | 'danger'
   label: string
@@ -84,6 +91,14 @@ export const dashboardService = {
     if (kostId) params.kost_id = kostId
     if (regionId) params.region_id = regionId
     const response = await httpClient.get('/dashboard/trend-bars', { params })
+    return response.data
+  },
+
+  async getSummary(kostId?: string, regionId?: string): Promise<DashboardSummaryResponse> {
+    const params: Record<string, any> = {}
+    if (kostId) params.kost_id = kostId
+    if (regionId) params.region_id = regionId
+    const response = await httpClient.get('/dashboard/summary', { params })
     return response.data
   },
 

@@ -20,6 +20,7 @@ from app.features.dashboard.schemas import (
     IncomeTrendResponse,
     TrendBarItem,
     TrendBarResponse,
+    DashboardSummaryResponse,
     TenantPaymentStatus,
     TenantTrackerItem,
     TenantTrackerResponse,
@@ -458,3 +459,36 @@ class DashboardService:
             week_num += 1
 
         return TrendBarResponse(period=period_label, items=items)
+
+    def get_summary(self, kost_id: UUID = None, region_id: UUID = None) -> DashboardSummaryResponse:
+        """Get bundled dashboard data."""
+        stats = self.get_stats(kost_id=kost_id, region_id=region_id)
+        trend_bars = self.get_trend_bars(kost_id=kost_id, region_id=region_id, period="month")
+
+        dp_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+            Transaction.category == "dp",
+            Transaction.is_frozen == True,
+            Transaction.financial_class == "LIABILITY",
+        )
+        dp_count_query = self.db.query(func.count(func.distinct(Transaction.tenant_id))).filter(
+            Transaction.category == "dp",
+            Transaction.is_frozen == True,
+            Transaction.financial_class == "LIABILITY",
+        )
+
+        if kost_id:
+            dp_query = dp_query.filter(Transaction.kost_id == kost_id)
+            dp_count_query = dp_count_query.filter(Transaction.kost_id == kost_id)
+        elif region_id:
+            dp_query = dp_query.filter(Transaction.region_id == region_id)
+            dp_count_query = dp_count_query.filter(Transaction.region_id == region_id)
+
+        dp_total = dp_query.scalar() or Decimal("0")
+        dp_count = dp_count_query.scalar() or 0
+
+        return DashboardSummaryResponse(
+            stats=stats,
+            trend_bars=trend_bars,
+            dp_total=dp_total,
+            dp_count=dp_count,
+        )

@@ -139,10 +139,8 @@ import {
 import type { ChartOptions } from 'chart.js'
 import dashboardService, {
   type DashboardStats,
-  type IncomeTrendResponse,
   type TrendBarResponse,
 } from '../services/dashboardService'
-import tenantService from '../../tenants/services/tenantService'
 import regionService, { type Region } from '../../regions/services/regionService'
 import { useUserStore } from '../../../shared/stores/userStore'
 
@@ -166,12 +164,6 @@ const stats = ref<DashboardStats>({
 })
 
 // Income trend data
-const incomeTrend = ref<IncomeTrendResponse>({
-  period: '',
-  items: [],
-  total: 0,
-})
-
 const trendBars = ref<TrendBarResponse>({
   period: '',
   items: [],
@@ -188,24 +180,12 @@ const todayNetRevenue = computed(() => stats.value.net_revenue_to_date || 0)
 async function fetchDashboardData() {
   loading.value = true
   try {
-    const [statsData, trendData, barData, dpData] = await Promise.all([
-      dashboardService.getStats(undefined, selectedRegionId.value || undefined),
-      dashboardService.getIncomeTrend(undefined, 'month', selectedRegionId.value || undefined),
-      dashboardService.getTrendBars(undefined, 'month', selectedRegionId.value || undefined),
-      tenantService.getAll({
-        region_id: selectedRegionId.value || undefined,
-        status: 'dp',
-        page: 1,
-        page_size: 100,
-      }),
-    ])
-
-    stats.value = statsData
-    incomeTrend.value = trendData
-    trendBars.value = barData
+    const summary = await dashboardService.getSummary(undefined, selectedRegionId.value || undefined)
+    stats.value = summary.stats
+    trendBars.value = summary.trend_bars
     dpSummary.value = {
-      total: dpData.items.reduce((sum, t) => sum + (t.dp_amount || 0), 0),
-      count: dpData.items.length,
+      total: summary.dp_total,
+      count: summary.dp_count,
     }
   } catch (error) {
     console.error('Failed to fetch dashboard data:', error)
@@ -217,16 +197,6 @@ async function fetchDashboardData() {
       occupancy_rate: 84,
       tenant_change_percent: 12,
       net_revenue_to_date: 0,
-    }
-    incomeTrend.value = {
-      period: '4 Minggu Terakhir',
-      items: [
-        { label: 'Minggu 1', amount: 8000000 },
-        { label: 'Minggu 2', amount: 12000000 },
-        { label: 'Minggu 3', amount: 22000000 },
-        { label: 'Minggu 4', amount: 28000000 },
-      ],
-      total: 70000000,
     }
     trendBars.value = {
       period: '4 Minggu Terakhir',

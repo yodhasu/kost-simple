@@ -10,24 +10,33 @@ export interface RegionListResponse {
   items: Region[]
 }
 
+let regionCache: RegionListResponse | null = null
+
 const regionService = {
-  async getAll(): Promise<RegionListResponse> {
+  async getAll(force = false): Promise<RegionListResponse> {
+    if (!force && regionCache) {
+      return regionCache
+    }
     const response = await httpClient.get<RegionListResponse>('/regions')
+    regionCache = response.data
     return response.data
   },
 
   async create(name: string): Promise<Region> {
     const response = await httpClient.post<Region>('/regions', { name })
+    regionCache = null
     return response.data
   },
 
   async update(id: string, name: string): Promise<Region> {
     const response = await httpClient.put<Region>(`/regions/${id}`, { name })
+    regionCache = null
     return response.data
   },
 
   async delete(id: string): Promise<void> {
     await httpClient.delete(`/regions/${id}`)
+    regionCache = null
   },
 }
 

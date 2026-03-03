@@ -45,6 +45,14 @@ class TrendBarResponse(BaseModel):
     items: List[TrendBarItem]
 
 
+class DashboardSummaryResponse(BaseModel):
+    """Dashboard summary response (bundled data)."""
+    stats: DashboardStats
+    trend_bars: TrendBarResponse
+    dp_total: Decimal
+    dp_count: int
+
+
 class TenantPaymentStatus(BaseModel):
     """Payment status for tenant tracker."""
     type: str  # success, warning, danger
