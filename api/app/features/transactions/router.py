@@ -62,6 +62,10 @@ async def create_payment(data: PaymentCreate, db: Session = Depends(get_db)):
     kost = db.query(Kost).filter(Kost.id == data.kost_id).first()
     
     # Create rent income transaction
+    description = f"Pembayaran sewa dari {tenant.name}"
+    if tenant.status == "dp":
+        description = f"Pelunasan DP dari {tenant.name}"
+
     rent_tx = Transaction(
         kost_id=data.kost_id,
         tenant_id=data.tenant_id,
@@ -69,7 +73,7 @@ async def create_payment(data: PaymentCreate, db: Session = Depends(get_db)):
         category="rent",
         amount=data.amount,
         transaction_date=data.transaction_date,
-        description=f"Pembayaran sewa dari {tenant.name}",
+        description=description,
         region_id=kost.region_id if kost else None,
         is_frozen=False,
     )

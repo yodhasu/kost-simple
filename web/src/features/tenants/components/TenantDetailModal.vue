@@ -298,6 +298,7 @@ function closePaymentModal() {
 function handlePaymentSaved() {
   closePaymentModal()
   emit('updated')
+  emit('close')
 }
 
 async function submitStatusChange() {
@@ -309,6 +310,7 @@ async function submitStatusChange() {
     tenant.value.status = nextStatus.value
     emit('updated')
     closeStatusModal()
+    emit('close')
   } catch (e) {
     console.error('Failed to update tenant status', e)
     toast.push('error', 'Gagal mengubah status penyewa')

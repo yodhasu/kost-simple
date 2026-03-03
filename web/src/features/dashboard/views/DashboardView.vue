@@ -6,6 +6,7 @@
         Region
       </label>
       <select v-model="selectedRegionId" class="region-select" :disabled="loadingRegions || regionOptions.length <= 1">
+        <option value="">Semua Region</option>
         <option v-for="region in regionOptions" :key="region.id" :value="region.id">
           {{ region.name }}
         </option>
@@ -17,45 +18,57 @@
     </div>
 
     <div v-if="!loading" class="dashboard-grid">
-      <div class="chart-section card">
-        <div class="chart-header">
-          <div>
-            <h2 class="chart-title">Garis Tren Pendapatan</h2>
-            <p class="chart-subtitle">Performansi keuangan bulan ini</p>
+      <div class="summary-row">
+        <div class="summary-card card">
+          <div class="summary-content">
+            <p class="summary-label">Total Pendapatan Bersih per Hari Ini</p>
+            <h3 class="summary-value">{{ formatCurrency(todayNetRevenue) }}</h3>
+            <p class="summary-sub">{{ stats.tenant_change_percent ?? 0 }}% dari kemarin</p>
           </div>
-          <select v-model="selectedPeriod" class="period-select" @change="onPeriodChange">
-            <option v-for="opt in periodOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
         </div>
-        <div class="chart-container">
-          <Line :data="chartData" :options="chartOptions" />
+        <div class="summary-card card">
+          <div class="summary-content">
+            <div class="summary-title">
+              <p class="summary-label">Total DP</p>
+            </div>
+            <h3 class="summary-value">{{ formatCurrency(dpSummary.total) }}</h3>
+            <p class="summary-sub">{{ dpSummary.count }} tenant masih DP</p>
+          </div>
         </div>
       </div>
 
-      <div class="stats-section">
+      <div class="chart-section card">
+        <div class="chart-header">
+          <div>
+            <h2 class="chart-title">Tren Pendapatan</h2>
+            <p class="chart-subtitle">Performansi keuangan bulan ini</p>
+          </div>
+        </div>
+        <div class="chart-container">
+          <Bar :data="chartData" :options="chartOptions" />
+        </div>
+        <div class="chart-legend">
+          <span class="legend-item">
+            <span class="legend-dot legend-green"></span>
+            Pendapatan
+          </span>
+          <span class="legend-item">
+            <span class="legend-dot legend-red"></span>
+            Pengeluaran
+          </span>
+        </div>
+      </div>
+
+      <div class="stats-row">
         <div class="stat-card card">
           <div class="stat-row">
             <div class="stat-content">
               <p class="stat-label">Penyewa Aktif</p>
               <h3 class="stat-value">{{ stats.total_tenants }}</h3>
+              <p class="stat-subtitle-text">Tenant yang masih berjalan</p>
             </div>
             <div class="stat-icon blue">
               <span class="material-symbols-outlined">group</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="stat-card card">
-          <div class="stat-row">
-            <div class="stat-content">
-              <p class="stat-label">Total Kamar</p>
-              <h3 class="stat-value">{{ stats.total_rooms }}</h3>
-              <p class="stat-subtitle-text">Seluruh unit properti</p>
-            </div>
-            <div class="stat-icon orange">
-              <span class="material-symbols-outlined">bedroom_parent</span>
             </div>
           </div>
         </div>
@@ -72,59 +85,40 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div v-else class="dashboard-grid">
-      <div class="chart-section card">
-        <div class="chart-header">
-          <div>
-            <h2 class="chart-title">Garis Tren Pendapatan</h2>
-            <p class="chart-subtitle">Memuat data...</p>
-          </div>
-        </div>
-        <div class="chart-container skeleton-block"></div>
-      </div>
-
-      <div class="stats-section">
-        <div class="stat-card card">
-          <div class="stat-row">
-            <div class="stat-content">
-              <p class="stat-label">Penyewa Aktif</p>
-              <div class="skeleton-line w-120"></div>
-              <div class="skeleton-line w-160"></div>
-            </div>
-            <div class="stat-icon blue">
-              <span class="material-symbols-outlined">group</span>
-            </div>
-          </div>
-        </div>
 
         <div class="stat-card card">
           <div class="stat-row">
             <div class="stat-content">
               <p class="stat-label">Total Kamar</p>
-              <div class="skeleton-line w-120"></div>
-              <div class="skeleton-line w-160"></div>
+              <h3 class="stat-value">{{ stats.total_rooms }}</h3>
+              <p class="stat-subtitle-text">Seluruh unit properti</p>
             </div>
             <div class="stat-icon orange">
               <span class="material-symbols-outlined">bedroom_parent</span>
             </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="stat-card card">
-          <div class="stat-row">
-            <div class="stat-content">
-              <p class="stat-label">Kamar Kosong</p>
-              <div class="skeleton-line w-120"></div>
-              <div class="skeleton-line w-160"></div>
-            </div>
-            <div class="stat-icon red">
-              <span class="material-symbols-outlined">door_front</span>
-            </div>
+    <div v-else class="dashboard-grid">
+      <div class="summary-row">
+        <div class="summary-card card skeleton-block"></div>
+        <div class="summary-card card skeleton-block"></div>
+      </div>
+      <div class="chart-section card">
+        <div class="chart-header">
+          <div>
+            <h2 class="chart-title">Tren Pendapatan</h2>
+            <p class="chart-subtitle">Memuat data...</p>
           </div>
         </div>
+        <div class="chart-container skeleton-block"></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card card skeleton-block"></div>
+        <div class="stat-card card skeleton-block"></div>
+        <div class="stat-card card skeleton-block"></div>
       </div>
     </div>
   </div>
@@ -134,38 +128,32 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Line } from 'vue-chartjs'
+import { Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
+  BarElement,
   Title,
   Tooltip,
-  Filler,
 } from 'chart.js'
 import dashboardService, {
   type DashboardStats,
   type IncomeTrendResponse,
+  type TrendBarResponse,
 } from '../services/dashboardService'
+import tenantService from '../../tenants/services/tenantService'
 import regionService, { type Region } from '../../regions/services/regionService'
 import { useUserStore } from '../../../shared/stores/userStore'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip)
 
-// Period options for chart
-const periodOptions = [
-  { label: 'Bulan Ini', value: 'month' },
-  { label: 'Semester Ini', value: 'semester' },
-  { label: 'Tahun Ini', value: 'year' },
-]
-const selectedPeriod = ref<'month' | 'semester' | 'year'>('month')
 const loading = ref(true)
 const userStore = useUserStore()
 const regionOptions = ref<Region[]>([])
 const loadingRegions = ref(false)
 const selectedRegionId = ref<string>('')
+const regionsReady = ref(false)
 
 // Stats data
 const stats = ref<DashboardStats>({
@@ -174,6 +162,7 @@ const stats = ref<DashboardStats>({
   empty_rooms: 0,
   occupancy_rate: 0,
   tenant_change_percent: null,
+  net_revenue_to_date: 0,
 })
 
 // Income trend data
@@ -183,18 +172,41 @@ const incomeTrend = ref<IncomeTrendResponse>({
   total: 0,
 })
 
+const trendBars = ref<TrendBarResponse>({
+  period: '',
+  items: [],
+})
+
+const dpSummary = ref({
+  total: 0,
+  count: 0,
+})
+
+const todayNetRevenue = computed(() => stats.value.net_revenue_to_date || 0)
 
 // Fetch dashboard data
 async function fetchDashboardData() {
   loading.value = true
   try {
-    const [statsData, trendData] = await Promise.all([
+    const [statsData, trendData, barData, dpData] = await Promise.all([
       dashboardService.getStats(undefined, selectedRegionId.value || undefined),
-      dashboardService.getIncomeTrend(undefined, selectedPeriod.value, selectedRegionId.value || undefined),
+      dashboardService.getIncomeTrend(undefined, 'month', selectedRegionId.value || undefined),
+      dashboardService.getTrendBars(undefined, 'month', selectedRegionId.value || undefined),
+      tenantService.getAll({
+        region_id: selectedRegionId.value || undefined,
+        status: 'dp',
+        page: 1,
+        page_size: 100,
+      }),
     ])
 
     stats.value = statsData
     incomeTrend.value = trendData
+    trendBars.value = barData
+    dpSummary.value = {
+      total: dpData.items.reduce((sum, t) => sum + (t.dp_amount || 0), 0),
+      count: dpData.items.length,
+    }
   } catch (error) {
     console.error('Failed to fetch dashboard data:', error)
     // Use fallback mock data for demo
@@ -204,6 +216,7 @@ async function fetchDashboardData() {
       empty_rooms: 8,
       occupancy_rate: 84,
       tenant_change_percent: 12,
+      net_revenue_to_date: 0,
     }
     incomeTrend.value = {
       period: '4 Minggu Terakhir',
@@ -215,32 +228,42 @@ async function fetchDashboardData() {
       ],
       total: 70000000,
     }
+    trendBars.value = {
+      period: '4 Minggu Terakhir',
+      items: [
+        { label: 'Minggu 1', income: 8000000, expense: 1500000 },
+        { label: 'Minggu 2', income: 12000000, expense: 2300000 },
+        { label: 'Minggu 3', income: 22000000, expense: 4000000 },
+        { label: 'Minggu 4', income: 28000000, expense: 3500000 },
+      ],
+    }
+    dpSummary.value = {
+      total: 0,
+      count: 0,
+    }
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => {
-  loadRegions().then(fetchDashboardData)
-})
-
-// Handle period change - refetch income trend only
-async function onPeriodChange() {
-  try {
-    const trendData = await dashboardService.getIncomeTrend(
-      undefined,
-      selectedPeriod.value,
-      selectedRegionId.value || undefined
-    )
-    incomeTrend.value = trendData
-  } catch (error) {
-    console.error('Failed to fetch income trend:', error)
-  }
-}
-
-watch(selectedRegionId, () => {
+onMounted(async () => {
+  await loadRegions()
   fetchDashboardData()
 })
+
+watch(selectedRegionId, () => {
+  if (regionsReady.value && !loadingRegions.value) {
+    fetchDashboardData()
+  }
+})
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+  }).format(amount)
+}
 
 async function loadRegions() {
   loadingRegions.value = true
@@ -253,39 +276,42 @@ async function loadRegions() {
     } else {
       regionOptions.value = items
     }
-    if (!selectedRegionId.value && regionOptions.value.length > 0) {
-      selectedRegionId.value = regionOptions.value[0]!.id
+    if (selectedRegionId.value && !regionOptions.value.find(r => r.id === selectedRegionId.value)) {
+      selectedRegionId.value = ''
     }
   } catch (e) {
     console.error('Failed to load regions:', e)
   } finally {
     loadingRegions.value = false
+    regionsReady.value = true
   }
 }
 
 // Chart data from API
 const chartData = computed(() => {
-  const items = incomeTrend.value.items
-  const amounts = items.map((item) => (Number(item.amount) || 0) / 1000000)
+  const items = trendBars.value.items
+  const labels = items.map(i => i.label)
+  const incomeRaw = items.map((item) => Number(item.income) || 0)
+  const expenseRaw = items.map((item) => Number(item.expense) || 0)
+  const incomeAmounts = incomeRaw.map((amount) => amount / 1000000)
+  const expenseAmounts = expenseRaw.map((amount) => amount / 1000000)
 
   return {
-    labels: items.map(i => i.label),
+    labels,
     datasets: [{
-      data: amounts,
-      borderColor: '#0f766d',
-      backgroundColor: (context: any) => {
-        const ctx = context.chart.ctx
-        const gradient = ctx.createLinearGradient(0, 0, 0, 200)
-        gradient.addColorStop(0, 'rgba(15, 118, 109, 0.3)')
-        gradient.addColorStop(1, 'rgba(15, 118, 109, 0.02)')
-        return gradient
-      },
-      fill: true,
-      tension: 0.4,
-      pointRadius: 0,
-      pointHoverRadius: 6,
-      pointBackgroundColor: '#0f766d',
-      borderWidth: 2,
+      label: 'Pengeluaran',
+      data: expenseAmounts,
+      backgroundColor: '#DC2626',
+      borderRadius: 6,
+      borderSkipped: false,
+      barThickness: 18,
+    }, {
+      label: 'Pendapatan',
+      data: incomeAmounts,
+      backgroundColor: '#0f766d',
+      borderRadius: 6,
+      borderSkipped: false,
+      barThickness: 18,
     }],
   }
 })
@@ -296,6 +322,8 @@ const chartOptions = {
   plugins: {
     legend: { display: false },
     tooltip: {
+      mode: 'index',
+      intersect: false,
       callbacks: {
         label: (context: any) => {
           const value = context.raw * 1000000 // Convert back from millions
@@ -408,6 +436,55 @@ const chartOptions = {
   gap: 1.25rem;
 }
 
+/* Summary Row */
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.summary-card {
+  padding: 1.25rem 1.5rem;
+}
+
+.summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.summary-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.summary-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.summary-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1F2937;
+}
+
+.summary-sub {
+  font-size: 0.875rem;
+  color: #059669;
+}
+
+.badge-hold {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: #FEF3C7;
+  color: #D97706;
+}
+
 /* Chart Section */
 .chart-section {
   padding: 1.25rem 1.5rem;
@@ -429,25 +506,45 @@ const chartOptions = {
 
 .chart-subtitle {
   font-size: 0.8125rem;
-  color: var(--primary);
-}
-
-.period-select {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: white;
-  color: var(--text-secondary);
-  cursor: pointer;
+  color: var(--text-muted);
 }
 
 .chart-container {
   height: 180px;
 }
 
-/* Stats Section */
-.stats-section {
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.legend-green {
+  background: #0f766d;
+}
+
+.legend-red {
+  background: #DC2626;
+}
+
+/* Stats Row */
+.stats-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.25rem;
@@ -494,8 +591,8 @@ const chartOptions = {
 }
 
 .stat-icon {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -504,7 +601,7 @@ const chartOptions = {
 }
 
 .stat-icon .material-symbols-outlined {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
 }
 
 .stat-icon.blue {
@@ -524,18 +621,31 @@ const chartOptions = {
 
 /* Responsive */
 @media (max-width: 900px) {
-  .stats-section {
-    grid-template-columns: repeat(3, 1fr);
+  .summary-row {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
+  .dashboard {
+    overflow-x: hidden;
+  }
+
+  .dashboard-grid {
+    width: 100%;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .chart-section {
     padding: 0.75rem 1rem;
   }
 
   .chart-container {
-    height: 120px;
+    height: 180px;
   }
 
   .chart-title {
@@ -546,31 +656,61 @@ const chartOptions = {
     font-size: 0.75rem;
   }
 
-  .stats-section {
+  .summary-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .summary-card {
+    padding: 1rem 1.25rem;
+  }
+
+  .chart-legend {
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+  }
+
+  .stats-row {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
   }
 
   .stat-card {
-    padding: 0.625rem 0.5rem;
+    padding: 0.875rem 1rem;
   }
 
   .stat-label {
-    font-size: 0.625rem;
+    font-size: 0.75rem;
   }
 
   .stat-value {
-    font-size: 1.25rem;
+    font-size: 2rem;
+  }
+
+  .stat-row {
+    align-items: center;
   }
 
   .stat-icon {
-    display: none;
+    display: flex;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+  }
+
+  .stat-icon .material-symbols-outlined {
+    font-size: 1.8rem;
+  }
+
+  .chart-container canvas {
+    max-width: 100% !important;
+    width: 100% !important;
   }
 
   .stat-subtitle-text,
   .stat-warning {
-    font-size: 0.625rem;
+    font-size: 0.875rem;
   }
 }
 </style>

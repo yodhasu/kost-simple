@@ -6,6 +6,7 @@ export interface DashboardStats {
   empty_rooms: number
   occupancy_rate: number
   tenant_change_percent: number | null
+  net_revenue_to_date: number
 }
 
 export interface IncomeTrendItem {
@@ -17,6 +18,17 @@ export interface IncomeTrendResponse {
   period: string
   items: IncomeTrendItem[]
   total: number
+}
+
+export interface TrendBarItem {
+  label: string
+  income: number
+  expense: number
+}
+
+export interface TrendBarResponse {
+  period: string
+  items: TrendBarItem[]
 }
 
 export interface TenantPaymentStatus {
@@ -60,6 +72,18 @@ export const dashboardService = {
     if (kostId) params.kost_id = kostId
     if (regionId) params.region_id = regionId
     const response = await httpClient.get('/dashboard/income-trend', { params })
+    return response.data
+  },
+
+  async getTrendBars(
+    kostId?: string,
+    period: 'month' | 'semester' | 'year' = 'month',
+    regionId?: string
+  ): Promise<TrendBarResponse> {
+    const params: Record<string, any> = { period }
+    if (kostId) params.kost_id = kostId
+    if (regionId) params.region_id = regionId
+    const response = await httpClient.get('/dashboard/trend-bars', { params })
     return response.data
   },
 

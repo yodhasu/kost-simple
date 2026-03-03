@@ -96,7 +96,7 @@ async def export_to_excel(
         elif data_type == "payments":
             _add_payments_sheet(wb, db, kost_ids, start_date, end_date)
         elif data_type == "expenses":
-            _add_expenses_sheet(wb, db, kost_ids, start_date, end_date)
+            _add_financial_sheet(wb, db, kost_ids, start_date, end_date)
         elif data_type == "activity":
             # Activity log is no longer supported.
             continue
@@ -199,38 +199,71 @@ def _add_payments_sheet(wb: Workbook, db: Session, kost_ids: list, start_date: d
     auto_size_columns(ws)
 
 
-def _add_expenses_sheet(wb: Workbook, db: Session, kost_ids: list, start_date: date, end_date: date):
-    """Add expenses data sheet."""
-    ws = wb.create_sheet("Laporan Pengeluaran")
-    
+def _add_financial_sheet(wb: Workbook, db: Session, kost_ids: list, start_date: date, end_date: date):
+    """Add financial report sheet (income, expense, and net)."""
+    ws = wb.create_sheet("Laporan Keuangan")
+
     # Headers
-    headers = ["Tanggal", "Nama Kost", "Kategori", "Jumlah", "Keterangan"]
+    headers = ["Tanggal", "Nama Kost", "Jenis", "Kategori", "Jumlah", "Keterangan"]
     ws.append(headers)
     style_header_row(ws)
-    
-    # Query expense transactions
-    query = db.query(Transaction).filter(
+
+    # Query income (exclude frozen) and expense transactions
+    income_query = db.query(Transaction).filter(
+        Transaction.financial_class == "REVENUE",
+        Transaction.is_frozen == False,
+        Transaction.transaction_date >= start_date,
+        Transaction.transaction_date <= end_date,
+    )
+    expense_query = db.query(Transaction).filter(
         Transaction.financial_class == "EXPENSE",
         Transaction.transaction_date >= start_date,
         Transaction.transaction_date <= end_date,
     )
     if kost_ids:
-        query = query.filter(Transaction.kost_id.in_(kost_ids))
-    
-    transactions = query.order_by(Transaction.transaction_date.desc()).all()
-    
-    for tx in transactions:
-        kost = db.query(Kost).filter(Kost.id == tx.kost_id).first()
-        kost_name = kost.name if kost else "-"
-        
+        income_query = income_query.filter(Transaction.kost_id.in_(kost_ids))
+        expense_query = expense_query.filter(Transaction.kost_id.in_(kost_ids))
+
+    income_txs = income_query.order_by(Transaction.transaction_date.desc()).all()
+    expense_txs = expense_query.order_by(Transaction.transaction_date.desc()).all()
+
+    total_income = 0
+    total_expense = 0
+
+    def get_kost_name(kost_id):
+        if not kost_id:
+            return "-"
+        kost = db.query(Kost).filter(Kost.id == kost_id).first()
+        return kost.name if kost else "-"
+
+    for tx in income_txs:
+        total_income += float(tx.amount)
         ws.append([
             tx.transaction_date.strftime("%d/%m/%Y"),
-            kost_name,
+            get_kost_name(tx.kost_id),
+            "Pendapatan",
             tx.category or "-",
             float(tx.amount),
             tx.description or "-",
         ])
-    
+
+    for tx in expense_txs:
+        total_expense += float(tx.amount)
+        ws.append([
+            tx.transaction_date.strftime("%d/%m/%Y"),
+            get_kost_name(tx.kost_id),
+            "Pengeluaran",
+            tx.category or "-",
+            float(tx.amount),
+            tx.description or "-",
+        ])
+
+    # Summary row
+    ws.append([])
+    ws.append(["", "", "Total Pendapatan", "", total_income, ""])
+    ws.append(["", "", "Total Pengeluaran", "", total_expense, ""])
+    ws.append(["", "", "Pendapatan Bersih", "", total_income - total_expense, ""])
+
     auto_size_columns(ws)
 
 

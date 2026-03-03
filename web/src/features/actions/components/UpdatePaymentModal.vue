@@ -71,18 +71,20 @@
                   <span>Biaya Sewa</span>
                   <span>{{ formatCurrency(selectedTenant.rent_price) }}</span>
                 </div>
-                <div class="fee-row">
-                  <span>Biaya Sampah</span>
-                  <span>-{{ formatCurrency(selectedTenant.trash_fee) }}</span>
-                </div>
-                <div class="fee-row">
-                  <span>Biaya Keamanan</span>
-                  <span>-{{ formatCurrency(selectedTenant.security_fee) }}</span>
-                </div>
-                <div class="fee-row">
-                  <span>Biaya Admin</span>
-                  <span>-{{ formatCurrency(selectedTenant.admin_fee) }}</span>
-                </div>
+                <template v-if="selectedTenant.status !== 'dp'">
+                  <div class="fee-row">
+                    <span>Biaya Sampah</span>
+                    <span>-{{ formatCurrency(selectedTenant.trash_fee) }}</span>
+                  </div>
+                  <div class="fee-row">
+                    <span>Biaya Keamanan</span>
+                    <span>-{{ formatCurrency(selectedTenant.security_fee) }}</span>
+                  </div>
+                  <div class="fee-row">
+                    <span>Biaya Admin</span>
+                    <span>-{{ formatCurrency(selectedTenant.admin_fee) }}</span>
+                  </div>
+                </template>
                 <div v-if="selectedTenant.status === 'dp'" class="fee-row">
                   <span>DP Dibayar</span>
                   <span>-{{ formatCurrency(selectedTenant.dp_amount) }}</span>

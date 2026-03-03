@@ -16,6 +16,7 @@ class DashboardStats(BaseModel):
     empty_rooms: int
     occupancy_rate: float
     tenant_change_percent: Optional[float] = None
+    net_revenue_to_date: Decimal = 0
 
 
 class IncomeTrendItem(BaseModel):
@@ -29,6 +30,19 @@ class IncomeTrendResponse(BaseModel):
     period: str
     items: List[IncomeTrendItem]
     total: Decimal
+
+
+class TrendBarItem(BaseModel):
+    """Single trend bar data point (income vs expense)."""
+    label: str
+    income: Decimal
+    expense: Decimal
+
+
+class TrendBarResponse(BaseModel):
+    """Bar trend response."""
+    period: str
+    items: List[TrendBarItem]
 
 
 class TenantPaymentStatus(BaseModel):

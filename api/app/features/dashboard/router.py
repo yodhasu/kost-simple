@@ -14,6 +14,7 @@ from app.features.users.service import UserProfileService
 from app.features.dashboard.schemas import (
     DashboardStats,
     IncomeTrendResponse,
+    TrendBarResponse,
     TenantTrackerResponse,
 )
 from app.features.dashboard.service import DashboardService
@@ -47,6 +48,18 @@ async def get_income_trend(
     """Get income trend data for chart."""
     service = DashboardService(db)
     return service.get_income_trend(kost_id=kost_id, region_id=region_id, period=period)
+
+
+@router.get("/trend-bars", response_model=TrendBarResponse)
+async def get_trend_bars(
+    kost_id: Optional[UUID] = Query(None, description="Filter by kost ID"),
+    period: str = Query("month", pattern="^(month|semester|year)$", description="Period: month, semester, or year"),
+    region_id: Optional[UUID] = Depends(get_current_user_region),
+    db: Session = Depends(get_db),
+):
+    """Get income vs expense trend data for bar chart."""
+    service = DashboardService(db)
+    return service.get_trend_bars(kost_id=kost_id, region_id=region_id, period=period)
 
 
 @router.get("/tenant-tracker", response_model=TenantTrackerResponse)

@@ -3,6 +3,7 @@ Dashboard service - Business logic for dashboard endpoints.
 """
 
 from datetime import date, timedelta
+import calendar
 from decimal import Decimal
 from typing import List, Tuple, Optional
 from uuid import UUID
@@ -17,6 +18,8 @@ from app.features.dashboard.schemas import (
     DashboardStats,
     IncomeTrendItem,
     IncomeTrendResponse,
+    TrendBarItem,
+    TrendBarResponse,
     TenantPaymentStatus,
     TenantTrackerItem,
     TenantTrackerResponse,
@@ -84,12 +87,35 @@ class DashboardService:
         if last_month_count > 0:
             tenant_change = round((total_tenants - last_month_count) / last_month_count * 100, 1)
 
+        # Net revenue up to today (exclude frozen DP)
+        revenue_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+            Transaction.financial_class == "REVENUE",
+            Transaction.is_frozen == False,
+            Transaction.transaction_date <= date.today(),
+        )
+        expense_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+            Transaction.financial_class == "EXPENSE",
+            Transaction.transaction_date <= date.today(),
+        )
+
+        if kost_id:
+            revenue_query = revenue_query.filter(Transaction.kost_id == kost_id)
+            expense_query = expense_query.filter(Transaction.kost_id == kost_id)
+        elif region_id:
+            revenue_query = revenue_query.filter(Transaction.region_id == region_id)
+            expense_query = expense_query.filter(Transaction.region_id == region_id)
+
+        revenue_total = revenue_query.scalar() or Decimal("0")
+        expense_total = expense_query.scalar() or Decimal("0")
+        net_revenue_to_date = revenue_total - expense_total
+
         return DashboardStats(
             total_tenants=total_tenants,
             total_rooms=int(total_rooms),
             empty_rooms=empty_rooms,
             occupancy_rate=round(occupancy_rate, 1),
-            tenant_change_percent=tenant_change
+            tenant_change_percent=tenant_change,
+            net_revenue_to_date=net_revenue_to_date,
         )
 
     def get_income_trend(self, kost_id: UUID = None, region_id: UUID = None, period: str = "month") -> IncomeTrendResponse:
@@ -276,3 +302,159 @@ class DashboardService:
             ))
 
         return TenantTrackerResponse(items=items, total=len(items))
+
+    def get_trend_bars(self, kost_id: UUID = None, region_id: UUID = None, period: str = "month") -> TrendBarResponse:
+        """Get income vs expense trend for bar chart."""
+        today = date.today()
+        items = []
+
+        month_abbr = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+                      "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+
+        if period == "month":
+            start_date = today.replace(day=1)
+            last_day = 28 if today.month == 2 else calendar.monthrange(today.year, today.month)[1]
+            end_date = today.replace(day=last_day)
+            period_label = f"Bulan {month_abbr[today.month - 1]} {today.year}"
+        elif period == "semester":
+            if today.month <= 6:
+                start_date = today.replace(month=1, day=1)
+                end_date = today.replace(month=6, day=30)
+                period_label = f"Semester 1 {today.year}"
+            else:
+                start_date = today.replace(month=7, day=1)
+                end_date = today.replace(month=12, day=31)
+                period_label = f"Semester 2 {today.year}"
+        else:
+            start_date = today.replace(month=1, day=1)
+            end_date = today.replace(month=12, day=31)
+            period_label = f"Tahun {today.year}"
+
+        kost_filter = []
+        if kost_id:
+            kost_filter = [Kost.id == kost_id]
+        elif region_id:
+            kost_filter = [Kost.region_id == region_id]
+
+        if period == "month":
+            last_day = 28 if today.month == 2 else calendar.monthrange(today.year, today.month)[1]
+            buckets = [
+                (1, 7),
+                (8, 14),
+                (15, 21),
+                (22, last_day),
+            ]
+            for start_day, end_day in buckets:
+                bucket_start = today.replace(day=start_day)
+                bucket_end = today.replace(day=end_day)
+
+                income_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+                    Transaction.financial_class == "REVENUE",
+                    Transaction.is_frozen == False,
+                    Transaction.transaction_date >= bucket_start,
+                    Transaction.transaction_date <= bucket_end,
+                )
+                fee_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+                    Transaction.financial_class == "EXPENSE",
+                    Transaction.reference_id.isnot(None),
+                    Transaction.transaction_date >= bucket_start,
+                    Transaction.transaction_date <= bucket_end,
+                )
+                expense_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+                    Transaction.financial_class == "EXPENSE",
+                    Transaction.transaction_date >= bucket_start,
+                    Transaction.transaction_date <= bucket_end,
+                )
+
+                if kost_id:
+                    income_query = income_query.filter(Transaction.kost_id == kost_id)
+                    fee_query = fee_query.filter(Transaction.kost_id == kost_id)
+                    expense_query = expense_query.filter(Transaction.kost_id == kost_id)
+                elif region_id:
+                    income_query = income_query.filter(Transaction.region_id == region_id)
+                    fee_query = fee_query.filter(Transaction.region_id == region_id)
+                    expense_query = expense_query.filter(Transaction.region_id == region_id)
+
+                income_amount = income_query.scalar() or Decimal("0")
+                fee_amount = fee_query.scalar() or Decimal("0")
+                expense_amount = expense_query.scalar() or Decimal("0")
+                net_income = income_amount - fee_amount
+
+                items.append(TrendBarItem(
+                    label=f"{start_day}-{end_day}",
+                    income=net_income,
+                    expense=expense_amount,
+                ))
+
+            return TrendBarResponse(period=period_label, items=items)
+
+        current = start_date
+        current = current - timedelta(days=current.weekday())
+        week_num = 1
+        while current <= end_date:
+            week_start = current
+            week_end = current + timedelta(days=6)
+            query_start = max(week_start, start_date)
+            query_end = min(week_end, end_date)
+
+            if query_start <= query_end:
+                income_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).join(
+                    Kost, Transaction.kost_id == Kost.id
+                ).filter(
+                    and_(
+                        Transaction.financial_class == "REVENUE",
+                        Transaction.is_frozen == False,
+                        Transaction.transaction_date >= query_start,
+                        Transaction.transaction_date <= query_end,
+                    )
+                )
+                fee_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).join(
+                    Kost, Transaction.kost_id == Kost.id
+                ).filter(
+                    and_(
+                        Transaction.financial_class == "EXPENSE",
+                        Transaction.reference_id.isnot(None),
+                        Transaction.transaction_date >= query_start,
+                        Transaction.transaction_date <= query_end,
+                    )
+                )
+                expense_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).join(
+                    Kost, Transaction.kost_id == Kost.id
+                ).filter(
+                    and_(
+                        Transaction.financial_class == "EXPENSE",
+                        Transaction.transaction_date >= query_start,
+                        Transaction.transaction_date <= query_end,
+                    )
+                )
+
+                if kost_filter:
+                    income_query = income_query.filter(*kost_filter)
+                    fee_query = fee_query.filter(*kost_filter)
+                    expense_query = expense_query.filter(*kost_filter)
+
+                income_amount = income_query.scalar() or Decimal("0")
+                fee_amount = fee_query.scalar() or Decimal("0")
+                expense_amount = expense_query.scalar() or Decimal("0")
+                net_income = income_amount - fee_amount
+            else:
+                net_income = Decimal("0")
+                expense_amount = Decimal("0")
+
+            if period == "month":
+                label = f"Minggu {week_num}"
+            else:
+                month_name = month_abbr[week_start.month - 1]
+                week_of_month = (week_start.day - 1) // 7 + 1
+                label = f"{month_name} W{week_of_month}"
+
+            items.append(TrendBarItem(
+                label=label,
+                income=net_income,
+                expense=expense_amount,
+            ))
+
+            current += timedelta(days=7)
+            week_num += 1
+
+        return TrendBarResponse(period=period_label, items=items)

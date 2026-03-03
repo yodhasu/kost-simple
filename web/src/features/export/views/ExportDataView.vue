@@ -58,6 +58,7 @@
           <div class="form-group">
             <label class="form-label">Region</label>
             <select v-model="selectedRegionId" class="form-input">
+              <option value="">Semua Region</option>
               <option v-for="region in regionOptions" :key="region.id" :value="region.id">
                 {{ region.name }}
               </option>
@@ -77,7 +78,7 @@
 
             <label class="checkbox-item">
               <input type="checkbox" v-model="form.data_types" value="expenses" />
-              <span class="checkbox-label">Laporan Pengeluaran</span>
+              <span class="checkbox-label">Laporan Keuangan</span>
             </label>
 
           </div>
@@ -199,8 +200,8 @@ async function loadRegions() {
     } else {
       regionOptions.value = items
     }
-    if (!selectedRegionId.value && regionOptions.value.length > 0) {
-      selectedRegionId.value = regionOptions.value[0]!.id
+    if (selectedRegionId.value && !regionOptions.value.find(r => r.id === selectedRegionId.value)) {
+      selectedRegionId.value = ''
     }
   } catch (e) {
     console.error('Failed to load regions:', e)
