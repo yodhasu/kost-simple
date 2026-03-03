@@ -46,31 +46,52 @@
           </div>
         </div>
 
-        <!-- Payment History -->
+        <!-- Fee Breakdown -->
         <div class="section-title-row">
-          <h3>Riwayat Pembayaran</h3>
-          <button type="button" class="link-view-all" @click="openTransactionsModal">Lihat Semua</button>
+          <h3>Rincian Biaya</h3>
         </div>
         
-        <div class="history-list">
-          <div v-if="tenant.transactions.length === 0" class="empty-history">
-            Belum ada riwayat transaksi
+        <div class="fee-card">
+          <div class="fee-card-header">
+            <span class="material-symbols-outlined fee-icon">info</span>
+            <span class="fee-title">Status Pembayaran</span>
           </div>
-          <div 
-            v-for="tx in tenant.transactions.slice(0, 3)" 
-            :key="tx.id" 
-            class="history-item"
-          >
-            <div class="history-info">
-              <span class="history-date">{{ formatDateMonthYear(tx.transaction_date) }}</span>
-              <span class="history-sub" :class="{ 'history-sub--late': tx.type !== 'income' }">
-                Jatuh tempo: {{ getDueDate(tx.transaction_date) }}
-              </span>
+          <template v-if="tenant.status === 'dp'">
+            <div class="fee-row">
+              <span>Biaya Sewa</span>
+              <span>{{ formatCurrency(tenant.rent_price) }}</span>
             </div>
-            <div class="history-status" :class="tx.type === 'income' ? 'status-paid' : 'status-unpaid'">
-              {{ tx.type === 'income' ? 'Lunas' : 'Belum Bayar' }}
+            <div class="fee-row">
+              <span>DP Dibayar</span>
+              <span>-{{ formatCurrency(tenant.dp_amount) }}</span>
             </div>
-          </div>
+            <div class="fee-row fee-total">
+              <span>Biaya Pelunasan</span>
+              <span>{{ formatCurrency(dpRemaining) }}</span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="fee-row">
+              <span>Biaya Sewa</span>
+              <span>{{ formatCurrency(tenant.rent_price) }}</span>
+            </div>
+            <div class="fee-row">
+              <span>Biaya Sampah</span>
+              <span>-{{ formatCurrency(tenant.trash_fee) }}</span>
+            </div>
+            <div class="fee-row">
+              <span>Biaya Keamanan</span>
+              <span>-{{ formatCurrency(tenant.security_fee) }}</span>
+            </div>
+            <div class="fee-row">
+              <span>Biaya Admin</span>
+              <span>-{{ formatCurrency(tenant.admin_fee) }}</span>
+            </div>
+            <div class="fee-row fee-total">
+              <span>Pendapatan Bersih</span>
+              <span>{{ formatCurrency(netRevenue) }}</span>
+            </div>
+          </template>
         </div>
 
         <!-- Emergency Contact Removed -->
@@ -95,55 +116,24 @@
             Nomor WhatsApp Tidak Tersedia
           </a>
           <div class="action-row" v-if="tenant.status !== 'inaktif'">
-            <button class="btn-outline" @click="openStatusModal">Ubah Status</button>
-            <button class="btn-outline text-red" @click="$emit('set-inactive')">Set Inaktif</button>
+            <button
+              class="btn-outline"
+              @click="tenant.status === 'dp' ? openPaymentModal() : openStatusModal()"
+            >
+              {{ tenant.status === 'dp' ? 'Update Pembayaran' : 'Ubah Status' }}
+            </button>
+            <button class="btn-danger" @click="$emit('set-inactive')">Hapus</button>
           </div>
         </div>
       </div>
   </BaseModal>
 
-  <BaseModal v-if="showTransactionsModal && tenant" :visible="true" size="md" :show-close="false" @close="closeTransactionsModal">
-    <div class="tx-modal">
-      <div class="tx-modal-header">
-        <div>
-          <h4>Riwayat Transaksi</h4>
-          <p>{{ tenant.name }}</p>
-        </div>
-        <button class="close-btn" @click="closeTransactionsModal">
-          <span class="material-symbols-outlined">close</span>
-        </button>
-      </div>
-
-      <div class="tx-modal-body">
-        <div v-if="sortedTransactions.length === 0" class="empty-history">
-          Belum ada riwayat transaksi
-        </div>
-        <div v-else class="tx-list">
-          <div v-for="tx in sortedTransactions" :key="tx.id" class="tx-item">
-            <div class="tx-left">
-              <div class="tx-title">
-                <span class="tx-type" :class="tx.type === 'income' ? 'tx-type-income' : 'tx-type-expense'">
-                  {{ tx.type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}
-                </span>
-                <span class="tx-category" v-if="tx.category">{{ tx.category }}</span>
-              </div>
-              <div class="tx-meta">
-                <span>{{ formatDate(tx.transaction_date) }}</span>
-                <span v-if="tx.description">· {{ tx.description }}</span>
-              </div>
-            </div>
-            <div class="tx-amount" :class="tx.type === 'income' ? 'tx-amount-income' : 'tx-amount-expense'">
-              {{ formatCurrency(tx.amount) }}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="tx-modal-actions">
-        <button class="btn-outline" @click="closeTransactionsModal">Tutup</button>
-      </div>
-    </div>
-  </BaseModal>
+  <UpdatePaymentModal
+    v-if="showPaymentModal && tenant"
+    :region-id="undefined"
+    @close="closePaymentModal"
+    @saved="handlePaymentSaved"
+  />
 
   <BaseModal v-if="showStatusModal && tenant" :visible="true" size="sm" :show-close="false" @close="closeStatusModal">
     <div class="status-modal">
@@ -184,6 +174,7 @@
 import { ref, onMounted, computed } from 'vue'
 import BaseModal from '../../../shared/components/base/BaseModal.vue'
 import tenantService, { type TenantDetail } from '../services/tenantService'
+import UpdatePaymentModal from '../../actions/components/UpdatePaymentModal.vue'
 import { useToastStore } from '../../../shared/stores/toastStore'
 
 const props = defineProps<{
@@ -199,9 +190,9 @@ const emit = defineEmits<{
 const loading = ref(true)
 const tenant = ref<TenantDetail | null>(null)
 const showStatusModal = ref(false)
+const showPaymentModal = ref(false)
 const savingStatus = ref(false)
 const nextStatus = ref<'aktif' | 'pindah' | 'renovasi' | ''>('')
-const showTransactionsModal = ref(false)
 const toast = useToastStore()
 
 const statusOptions = [
@@ -215,14 +206,20 @@ const availableStatusOptions = computed(() => {
   return statusOptions.filter((opt) => opt.value !== tenant.value!.status)
 })
 
-const sortedTransactions = computed(() => {
-  const txs = tenant.value?.transactions ?? []
-  return [...txs].sort((a, b) => {
-    const ad = new Date(a.transaction_date).getTime()
-    const bd = new Date(b.transaction_date).getTime()
-    if (bd !== ad) return bd - ad
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  })
+const netRevenue = computed(() => {
+  if (!tenant.value) return 0
+  const rent = tenant.value.rent_price || 0
+  const trash = tenant.value.trash_fee || 0
+  const security = tenant.value.security_fee || 0
+  const admin = tenant.value.admin_fee || 0
+  return rent - trash - security - admin
+})
+
+const dpRemaining = computed(() => {
+  if (!tenant.value) return 0
+  const rent = tenant.value.rent_price || 0
+  const dpAmount = tenant.value.dp_amount || 0
+  return Math.max(0, rent - dpAmount)
 })
 
 
@@ -270,23 +267,6 @@ function formatDateMonth(dateStr: string | null): string {
   return new Intl.DateTimeFormat('id-ID', { month: 'short', year: 'numeric' }).format(new Date(dateStr))
 }
 
-function formatDateMonthYear(dateStr: string): string {
-  return new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(new Date(dateStr))
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '-'
-  return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(dateStr))
-}
-
-function getDueDate(dateStr: string | null): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  date.setMonth(date.getMonth() + 1)
-  
-  return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
-}
-
 function getWhatsAppLink(phone: string | null): string {
   if (!phone) return '#'
   // Simple formatter: replace 08 with 628, remove spaces
@@ -307,12 +287,17 @@ function closeStatusModal() {
   nextStatus.value = ''
 }
 
-function openTransactionsModal() {
-  showTransactionsModal.value = true
+function openPaymentModal() {
+  showPaymentModal.value = true
 }
 
-function closeTransactionsModal() {
-  showTransactionsModal.value = false
+function closePaymentModal() {
+  showPaymentModal.value = false
+}
+
+function handlePaymentSaved() {
+  closePaymentModal()
+  emit('updated')
 }
 
 async function submitStatusChange() {
@@ -502,72 +487,50 @@ async function submitStatusChange() {
   cursor: pointer;
 }
 
-/* History List */
-.history-list {
+/* Fee Breakdown */
+.fee-card {
+  background: #ECFDF5;
+  border: 1px solid #BBF7D0;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.5rem;
   margin-bottom: 2rem;
 }
 
-.history-item {
+.fee-card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #F3F4F6;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: #047857;
+  margin-bottom: 0.25rem;
 }
 
-.history-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.history-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.history-date {
-  font-weight: 600;
-  color: #111827;
-  font-size: 0.9375rem;
-}
-
-.history-sub {
-  font-size: 0.75rem;
-  color: #6B7280;
-}
-
-.history-sub--late {
-  color: #EF4444;
-}
-
-.history-status {
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-
-.status-paid {
+.fee-icon {
+  font-size: 1.25rem;
   color: #059669;
 }
 
-.status-unpaid {
-  color: #DC2626;
+.fee-title {
+  font-size: 0.9375rem;
 }
 
-.empty-history {
-  text-align: center;
-  color: #9CA3AF;
+.fee-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 0.875rem;
-  padding: 1rem;
+  color: #047857;
 }
 
-.emergency-contact {
-  color: #4B5563;
-  font-size: 0.875rem;
-  margin-bottom: 2rem;
+.fee-total {
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed #86EFAC;
+  font-weight: 700;
+  color: #059669;
 }
 
 /* Actions */
@@ -633,32 +596,28 @@ async function submitStatusChange() {
   background: #F9FAFB;
 }
 
-.text-red {
-  color: #DC2626;
-  border-color: #FECACA;
+.btn-danger {
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-weight: 600;
+  background: #DC2626;
+  color: white;
+  border: 1px solid #DC2626;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.text-red:hover {
-  background: #FEF2F2;
-}
-
-.status-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 1rem;
+.btn-danger:hover {
+  background: #B91C1C;
+  border-color: #B91C1C;
 }
 
 .status-modal {
   width: 100%;
-  max-width: 420px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  max-width: 520px;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .status-modal-header {
@@ -759,120 +718,5 @@ async function submitStatusChange() {
 .status-inaktif {
   background: #F3F4F6;
   color: #6B7280;
-}
-
-/* Transactions Modal */
-.tx-modal {
-  width: 100%;
-  max-width: 640px;
-}
-
-.tx-modal-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 0.5rem 0 1rem;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.tx-modal-header h4 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #111827;
-  margin: 0 0 0.25rem;
-}
-
-.tx-modal-header p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.875rem;
-}
-
-.tx-modal-body {
-  padding: 1rem 0;
-}
-
-.tx-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.tx-item {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.tx-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.tx-left {
-  min-width: 0;
-  flex: 1;
-}
-
-.tx-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.tx-type {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
-}
-
-.tx-type-income {
-  background: #D1FAE5;
-  color: #059669;
-}
-
-.tx-type-expense {
-  background: #FEE2E2;
-  color: #DC2626;
-}
-
-.tx-category {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #111827;
-}
-
-.tx-meta {
-  font-size: 0.75rem;
-  color: #6B7280;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tx-amount {
-  font-size: 0.875rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.tx-amount-income {
-  color: #059669;
-}
-
-.tx-amount-expense {
-  color: #DC2626;
-}
-
-.tx-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 0.75rem;
-  border-top: 1px solid #f3f4f6;
 }
 </style>

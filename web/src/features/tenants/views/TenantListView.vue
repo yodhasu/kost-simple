@@ -2,9 +2,7 @@
   <div class="tenant-list">
     <!-- Header -->
     <div class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">Daftar Penyewa</h1>
-      </div>
+      <div class="header-left"></div>
       <div class="header-actions">
         <select v-model="selectedRegionId" class="region-select" :disabled="loadingRegions">
           <option value="">Semua Region</option>
@@ -68,7 +66,7 @@
             <th>KOST</th>
             <th>REGION</th>
             <th>TANGGAL MASUK</th>
-            <th>TOTAL BIAYA</th>
+            <th>BIAYA SEWA</th>
             <th>STATUS</th>
             <th>AKSI</th>
           </tr>
@@ -89,7 +87,7 @@
             <td>{{ tenant.kost_name || '-' }}</td>
             <td>{{ tenant.region_name || '-' }}</td>
             <td>{{ formatDate(tenant.start_date) }}</td>
-            <td>{{ formatCurrency(getTotalFee(tenant)) }}</td>
+            <td>{{ formatCurrency(tenant.rent_price || null) }}</td>
             <td>
               <span class="status-badge" :class="`status-${tenant.status}`">
                 {{ getStatusLabel(tenant.status) }}
@@ -415,15 +413,6 @@ function formatDate(dateStr: string | null): string {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
   return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-function getTotalFee(tenant: Tenant): number | null {
-  const rent = tenant.rent_price || 0
-  const trash = tenant.trash_fee || 0
-  const security = tenant.security_fee || 0
-  const admin = tenant.admin_fee || 0
-  const total = rent + trash + security + admin
-  return total > 0 ? total : null
 }
 
 function formatCurrency(amount: number | null): string {
@@ -758,7 +747,7 @@ async function loadRegions() {
   }
 
   .tenant-table td:nth-child(6)::before {
-    content: "Biaya: ";
+    content: "Sewa: ";
     font-weight: 600;
     color: var(--text-muted);
     font-size: 0.75rem;

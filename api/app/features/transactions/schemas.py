@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 class TransactionBase(BaseModel):
     """Base transaction schema."""
-    type: Literal["income", "expense"]
+    financial_class: Literal["REVENUE", "EXPENSE", "LIABILITY", "REFUND", "ADJUSTMENT"]
     category: Optional[str] = None
     amount: int = Field(..., ge=0)
     transaction_date: date
@@ -24,6 +24,8 @@ class TransactionResponse(TransactionBase):
     kost_id: Optional[UUID] = None
     tenant_id: Optional[UUID] = None
     region_id: Optional[UUID] = None
+    is_frozen: bool = False
+    reference_id: Optional[UUID] = None
     created_at: datetime
 
     class Config:

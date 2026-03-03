@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import List, Tuple, Optional
 from uuid import UUID
 
-from sqlalchemy import func, and_, cast, String
+from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 
 from app.features.kosts.model import Kost
@@ -152,18 +152,34 @@ class DashboardService:
             
             if query_start <= query_end:
                 # Query income for this week
-                query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).join(Kost, Transaction.kost_id == Kost.id).filter(
+                income_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).join(
+                    Kost, Transaction.kost_id == Kost.id
+                ).filter(
                     and_(
-                        cast(Transaction.type, String) == "income",
+                        Transaction.financial_class == "REVENUE",
+                        Transaction.is_frozen == False,
                         Transaction.transaction_date >= query_start,
-                        Transaction.transaction_date <= query_end
+                        Transaction.transaction_date <= query_end,
                     )
                 )
-                
+
+                fee_query = self.db.query(func.coalesce(func.sum(Transaction.amount), 0)).join(
+                    Kost, Transaction.kost_id == Kost.id
+                ).filter(
+                    and_(
+                        Transaction.reference_id.isnot(None),
+                        Transaction.transaction_date >= query_start,
+                        Transaction.transaction_date <= query_end,
+                    )
+                )
+
                 if kost_filter:
-                    query = query.filter(*kost_filter)
+                    income_query = income_query.filter(*kost_filter)
+                    fee_query = fee_query.filter(*kost_filter)
                 
-                amount = query.scalar() or Decimal("0")
+                income_amount = income_query.scalar() or Decimal("0")
+                fee_amount = fee_query.scalar() or Decimal("0")
+                amount = income_amount - fee_amount
             else:
                 amount = Decimal("0")
 
@@ -215,7 +231,8 @@ class DashboardService:
             last_payment = self.db.query(Transaction).filter(
                 and_(
                     Transaction.tenant_id == tenant.id,
-                    cast(Transaction.type, String) == "income",
+                    Transaction.financial_class == "REVENUE",
+                    Transaction.is_frozen == False,
                     Transaction.category == "rent"
                 )
             ).order_by(Transaction.transaction_date.desc()).first()

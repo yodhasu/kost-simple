@@ -8,7 +8,7 @@ from datetime import date
 import re
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func, cast, String
+from sqlalchemy import func
 from fastapi import HTTPException, status
 
 from app.core.exceptions import NotFoundException
@@ -52,8 +52,8 @@ class TenantsService:
             self.db.query(Transaction)
             .filter(
                 Transaction.tenant_id == tenant_id,
-                cast(Transaction.type, String) == "income",
                 Transaction.category == "dp",
+                Transaction.is_frozen == True,
             )
             .order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
             .first()
@@ -197,41 +197,56 @@ class TenantsService:
         kost = kost or self.db.query(Kost).filter(Kost.id == tenant.kost_id).first()
 
         if tenant.status == "dp" and dp_amount and dp_amount > 0:
+            transaction = Transaction(
+                kost_id=tenant.kost_id,
+                tenant_id=tenant.id,
+                financial_class="LIABILITY",
+                category="dp",
+                amount=dp_amount,
+                transaction_date=tenant.start_date or date.today(),
+                description=f"Pembayaran DP penyewa {tenant.name} due_date:{dp_due_date.isoformat()}",
+                region_id=kost.region_id if kost else None,
+                is_frozen=True,
+            )
+            self.db.add(transaction)
+        else:
+            rent_amount = tenant.rent_price or 0
+            rent_tx_id = None
+            if rent_amount > 0:
+                transaction = Transaction(
+                    kost_id=tenant.kost_id,
+                    tenant_id=tenant.id,
+                    financial_class="REVENUE",
+                    category="rent",
+                    amount=rent_amount,
+                    transaction_date=tenant.start_date or date.today(),
+                    description=f"Pembayaran awal penyewa {tenant.name}",
+                    region_id=kost.region_id if kost else None,
+                    is_frozen=False,
+                )
+                self.db.add(transaction)
+                self.db.flush()
+                rent_tx_id = transaction.id
+
             extra_fees = (
                 (tenant.trash_fee or 0)
                 + (tenant.security_fee or 0)
                 + (tenant.admin_fee or 0)
             )
-            transaction = Transaction(
-                kost_id=tenant.kost_id,
-                tenant_id=tenant.id,
-                type="income",
-                category="dp",
-                amount=dp_amount + extra_fees,
-                transaction_date=tenant.start_date or date.today(),
-                description=f"Pembayaran DP penyewa {tenant.name} (termasuk biaya lain) due_date:{dp_due_date.isoformat()}",
-                region_id=kost.region_id if kost else None,
-            )
-            self.db.add(transaction)
-        else:
-            total_amount = (
-                (tenant.rent_price or 0)
-                + (tenant.trash_fee or 0)
-                + (tenant.security_fee or 0)
-                + (tenant.admin_fee or 0)
-            )
-            if total_amount > 0:
-                transaction = Transaction(
+            if extra_fees > 0:
+                fee_tx = Transaction(
                     kost_id=tenant.kost_id,
                     tenant_id=tenant.id,
-                    type="income",
-                    category="rent",
-                    amount=total_amount,
+                    financial_class="EXPENSE",
+                    category="extra_fee",
+                    amount=extra_fees,
                     transaction_date=tenant.start_date or date.today(),
-                    description=f"Pembayaran awal penyewa {tenant.name}",
+                    description=f"Biaya ekstra penyewa {tenant.name}",
                     region_id=kost.region_id if kost else None,
+                    is_frozen=False,
+                    reference_id=rent_tx_id,
                 )
-                self.db.add(transaction)
+                self.db.add(fee_tx)
 
         self.db.commit()
         self.db.refresh(tenant)
@@ -264,8 +279,8 @@ class TenantsService:
                 self.db.query(Transaction)
                 .filter(
                     Transaction.tenant_id == tenant.id,
-                    cast(Transaction.type, String) == "income",
                     Transaction.category == "dp",
+                    Transaction.is_frozen == True,
                 )
                 .order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
                 .first()
@@ -286,29 +301,22 @@ class TenantsService:
                 )
 
             if dp_tx:
-                extra_fees = (
-                    (tenant.trash_fee or 0)
-                    + (tenant.security_fee or 0)
-                    + (tenant.admin_fee or 0)
-                )
-                dp_tx.amount = effective_dp_amount + extra_fees
-                dp_tx.description = f"Pembayaran DP penyewa {tenant.name} (termasuk biaya lain) due_date:{effective_due_date.isoformat()}"
+                dp_tx.amount = effective_dp_amount
+                dp_tx.description = f"Pembayaran DP penyewa {tenant.name} due_date:{effective_due_date.isoformat()}"
+                dp_tx.financial_class = "LIABILITY"
+                dp_tx.is_frozen = True
             else:
-                extra_fees = (
-                    (tenant.trash_fee or 0)
-                    + (tenant.security_fee or 0)
-                    + (tenant.admin_fee or 0)
-                )
                 self.db.add(
                     Transaction(
                         kost_id=tenant.kost_id,
                         tenant_id=tenant.id,
-                        type="income",
+                        financial_class="LIABILITY",
                         category="dp",
-                        amount=effective_dp_amount + extra_fees,
+                        amount=effective_dp_amount,
                         transaction_date=tenant.start_date or date.today(),
-                        description=f"Pembayaran DP penyewa {tenant.name} (termasuk biaya lain) due_date:{effective_due_date.isoformat()}",
+                        description=f"Pembayaran DP penyewa {tenant.name} due_date:{effective_due_date.isoformat()}",
                         region_id=kost.region_id if kost else None,
+                        is_frozen=True,
                     )
                 )
         
@@ -319,5 +327,20 @@ class TenantsService:
     def delete(self, tenant_id: UUID) -> None:
         """Soft delete tenant by setting is_active to False."""
         tenant = self.get_by_id(tenant_id)
+        # If tenant is DP, release frozen DP as revenue before deactivating.
+        if tenant.status == "dp":
+            dp_tx = (
+                self.db.query(Transaction)
+                .filter(
+                    Transaction.tenant_id == tenant.id,
+                    Transaction.category == "dp",
+                    Transaction.is_frozen == True,
+                )
+                .order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+                .first()
+            )
+            if dp_tx:
+                dp_tx.is_frozen = False
+                dp_tx.financial_class = "REVENUE"
         tenant.is_active = False
         self.db.commit()

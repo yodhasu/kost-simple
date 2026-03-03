@@ -71,17 +71,17 @@
                   <span>Biaya Sewa</span>
                   <span>{{ formatCurrency(selectedTenant.rent_price) }}</span>
                 </div>
-                <div v-if="selectedTenant.status !== 'dp'" class="fee-row">
+                <div class="fee-row">
                   <span>Biaya Sampah</span>
-                  <span>{{ formatCurrency(selectedTenant.trash_fee) }}</span>
+                  <span>-{{ formatCurrency(selectedTenant.trash_fee) }}</span>
                 </div>
-                <div v-if="selectedTenant.status !== 'dp'" class="fee-row">
+                <div class="fee-row">
                   <span>Biaya Keamanan</span>
-                  <span>{{ formatCurrency(selectedTenant.security_fee) }}</span>
+                  <span>-{{ formatCurrency(selectedTenant.security_fee) }}</span>
                 </div>
-                <div v-if="selectedTenant.status !== 'dp'" class="fee-row">
+                <div class="fee-row">
                   <span>Biaya Admin</span>
-                  <span>{{ formatCurrency(selectedTenant.admin_fee) }}</span>
+                  <span>-{{ formatCurrency(selectedTenant.admin_fee) }}</span>
                 </div>
                 <div v-if="selectedTenant.status === 'dp'" class="fee-row">
                   <span>DP Dibayar</span>
@@ -187,10 +187,7 @@ const totalTagihan = computed(() => {
     return Math.max(0, rent - dpAmount)
   }
 
-  const trash = selectedTenant.value.trash_fee || 0
-  const security = selectedTenant.value.security_fee || 0
-  const admin = selectedTenant.value.admin_fee || 0
-  return rent + trash + security + admin
+  return rent
 })
 
 // Auto-fill amount when tenant selected

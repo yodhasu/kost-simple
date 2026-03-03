@@ -20,7 +20,9 @@ export interface TransactionResponse {
   id: string
   kost_id: string
   tenant_id: string | null
-  type: 'income' | 'expense'
+  financial_class: 'REVENUE' | 'EXPENSE' | 'LIABILITY' | 'REFUND' | 'ADJUSTMENT'
+  is_frozen?: boolean
+  reference_id?: string | null
   category: string | null
   amount: number
   transaction_date: string

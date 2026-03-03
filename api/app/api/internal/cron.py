@@ -40,13 +40,15 @@ def update_tenant_status(
         WHERE
             t.end_date IS NULL
             AND t.status = 'aktif'
+            AND t.is_active = true
             AND current_date > t.start_date + interval '1 month'
             AND NOT EXISTS (
                 SELECT 1
                 FROM transactions tr
                 WHERE
                     tr.tenant_id = t.id
-                    AND tr.type = 'income'
+                    AND tr.financial_class = 'REVENUE'
+                    AND tr.is_frozen = false
                     AND tr.category = 'rent'
                     AND date_trunc('month', tr.transaction_date)
                         = date_trunc('month', current_date)
