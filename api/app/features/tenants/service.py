@@ -29,7 +29,6 @@ class TenantsService:
         query = self.db.query(func.count(Tenant.id)).filter(
             Tenant.kost_id == kost_id,
             Tenant.is_active == True,
-            Tenant.status.in_(["aktif", "dp"]),
         )
         if exclude_tenant_id:
             query = query.filter(Tenant.id != exclude_tenant_id)
@@ -178,7 +177,7 @@ class TenantsService:
         if not kost:
             raise NotFoundException("Kost not found")
 
-        if payload.get("status") in ("aktif", "dp"):
+        if payload.get("is_active", True):
             active_count = self._count_active_tenants(kost.id)
             if active_count >= kost.total_units:
                 raise HTTPException(
@@ -263,7 +262,7 @@ class TenantsService:
         for key, value in update_data.items():
             setattr(tenant, key, value)
 
-        if tenant.is_active and tenant.status in ("aktif", "dp"):
+        if tenant.is_active:
             kost = self.db.query(Kost).filter(Kost.id == tenant.kost_id).first()
             if kost:
                 active_count = self._count_active_tenants(kost.id, exclude_tenant_id=tenant.id)

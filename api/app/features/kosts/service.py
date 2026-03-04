@@ -27,7 +27,6 @@ class KostsService:
             .filter(
                 Tenant.kost_id == kost_id,
                 Tenant.is_active == True,
-                Tenant.status.in_(["aktif", "dp"]),
             )
             .scalar()
             or 0

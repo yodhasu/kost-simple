@@ -6,11 +6,15 @@ from typing import List, Optional
 from datetime import date
 from uuid import UUID
 from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
 from app.features.regions.model import Regions
 from app.core.exceptions import NotFoundException
 from app.features.regions.schemas import RegionsCreate, RegionsUpdate
 from app.features.users.model import UserProfile
 from app.features.users.user_region_model import UserRegion
+from app.features.kosts.model import Kost
+from app.features.tenants.model import Tenant
+from app.features.transactions.model import Transaction
 
 
 class RegionsService:
@@ -60,6 +64,23 @@ class RegionsService:
     def delete(self, item_id: UUID) -> None:
         """Delete item."""
         item = self.get_by_id(item_id)
-        self.db.query(UserRegion).filter(UserRegion.region_id == item_id).delete()
+        # Block deletion when region still has data.
+        has_kost = self.db.query(Kost.id).filter(Kost.region_id == item_id).first() is not None
+        has_tenants = (
+            self.db.query(Tenant.id)
+            .join(Kost, Tenant.kost_id == Kost.id)
+            .filter(Kost.region_id == item_id)
+            .first()
+            is not None
+        )
+        has_transactions = self.db.query(Transaction.id).filter(Transaction.region_id == item_id).first() is not None
+
+        if has_kost or has_tenants or has_transactions:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Region masih memiliki data terkait. Hapus data kost, penyewa, dan transaksi terlebih dahulu.",
+            )
+
+        self.db.query(UserRegion).filter(UserRegion.region_id == item_id).delete(synchronize_session=False)
         self.db.delete(item)
         self.db.commit()

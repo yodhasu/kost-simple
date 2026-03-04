@@ -44,7 +44,7 @@
               <button class="btn-icon" @click="openModal(region)" title="Edit">
                 <span class="material-symbols-outlined">edit</span>
               </button>
-              <button class="btn-icon btn-icon-danger" @click="confirmDelete(region)" title="Hapus">
+              <button class="btn-icon btn-icon-danger" @click="deleteRegion(region)" title="Hapus">
                 <span class="material-symbols-outlined">delete</span>
               </button>
             </td>
@@ -103,6 +103,7 @@ import { useToastStore } from '../../../shared/stores/toastStore'
 const regions = ref<Region[]>([])
 const loading = ref(true)
 const saving = ref(false)
+const deleting = ref(false)
 const showModal = ref(false)
 const editingRegion = ref<Region | null>(null)
 const toast = useToastStore()
@@ -165,16 +166,17 @@ async function handleSubmit() {
   }
 }
 
-async function confirmDelete(region: Region) {
-  if (!confirm(`Apakah Anda yakin ingin menghapus region "${region.name}"?`)) return
-
+async function deleteRegion(region: Region) {
+  deleting.value = true
   try {
     await regionService.delete(region.id)
     await loadRegions()
     window.dispatchEvent(new Event('setup-changed'))
   } catch (error) {
     console.error('Failed to delete region:', error)
-    toast.push('error', 'Gagal menghapus region')
+    toast.push('error', 'Gagal menghapus region. Masih ada data terkait.')
+  } finally {
+    deleting.value = false
   }
 }
 </script>
@@ -307,4 +309,5 @@ async function confirmDelete(region: Region) {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 </style>
