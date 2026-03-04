@@ -146,6 +146,10 @@ function closeSidebarIfMobile() {
 
 const setupRequired = computed(() => userStore.setupRequired)
 
+function handleSetupChanged() {
+  userStore.refreshSidebarUnlock()
+}
+
 onMounted(async () => {
   // Setup check runs via watch(userRole) below (needs role info).
   mobileMediaQuery = window.matchMedia('(max-width: 900px)')
@@ -155,6 +159,7 @@ onMounted(async () => {
   } else if (typeof (mobileMediaQuery as any).addListener === 'function') {
     ;(mobileMediaQuery as any).addListener(syncIsMobile)
   }
+  window.addEventListener('setup-changed', handleSetupChanged)
 })
 
 // Run setup checks once role is known (setup check runs on login only).
@@ -176,6 +181,7 @@ onBeforeUnmount(() => {
       ;(mobileMediaQuery as any).removeListener(syncIsMobile)
     }
   }
+  window.removeEventListener('setup-changed', handleSetupChanged)
 })
 
 watch(

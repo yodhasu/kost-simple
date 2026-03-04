@@ -12,6 +12,7 @@ from app.features.transactions.router import router as transactions_router
 from app.features.export.router import router as export_router
 from app.features.regions.router import router as regions_router
 from app.features.failsafe.router import router as failsafe_router
+from app.features.sidebar.router import router as sidebar_router
 
 api_router = APIRouter()
 
@@ -24,3 +25,4 @@ api_router.include_router(transactions_router, prefix="/transactions", tags=["Tr
 api_router.include_router(export_router, prefix="/export", tags=["Export"])
 api_router.include_router(regions_router, prefix="/regions", tags=["Regions"])
 api_router.include_router(failsafe_router, prefix="/failsafe", tags=["Failsafe"])
+api_router.include_router(sidebar_router, prefix="/sidebar", tags=["Sidebar"])

@@ -22,3 +22,9 @@ class SetupCheckResponse(BaseModel):
     regions_empty: bool
     admins_empty: bool
     setup_complete: bool
+
+
+class SidebarUnlockResponse(BaseModel):
+    regions_total: int
+    admins_total: int
+    unlock: bool

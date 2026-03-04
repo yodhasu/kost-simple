@@ -77,7 +77,7 @@ export const useUserStore = defineStore('user', {
       try {
         const response = await httpClient.get<UserProfile>('/users/me')
         this.userProfile = response.data
-        await this.checkSetupOnce()
+        await this.refreshSidebarUnlock()
         return response.data
       } catch (err) {
         console.error('Error fetching user profile:', err)
@@ -96,7 +96,7 @@ export const useUserStore = defineStore('user', {
         const credential = await signInWithEmailAndPassword(auth, email, password)
         this.user = credential.user
         await this.fetchUserProfile()
-        await this.checkSetupOnce()
+        await this.refreshSidebarUnlock()
         return credential.user
       } catch (err: any) {
         this.error = this._getErrorMessage(err.code)
@@ -116,7 +116,6 @@ export const useUserStore = defineStore('user', {
         this.userProfile = null
         this.setupRequired = false
         this.setupChecked = false
-        sessionStorage.removeItem('setup_check_done')
       } catch (err) {
         console.error('Sign out error:', err)
         throw err
@@ -131,28 +130,21 @@ export const useUserStore = defineStore('user', {
       return this.user.getIdToken()
     },
 
-    async checkSetupOnce(): Promise<void> {
-      if (this.setupChecked) return
-      if (sessionStorage.getItem('setup_check_done') === '1') {
-        this.setupChecked = true
-        return
-      }
+    async refreshSidebarUnlock(): Promise<void> {
       if (this.userProfile?.role !== 'owner') {
         this.setupRequired = false
         this.setupChecked = true
-        sessionStorage.setItem('setup_check_done', '1')
         return
       }
 
       try {
-        const setup = await setupService.getSetupCheck()
-        this.setupRequired = !setup.setup_complete
+        const setup = await setupService.getSidebarUnlock()
+        this.setupRequired = !setup.unlock
       } catch (e) {
-        console.error('Failed to check owner setup:', e)
+        console.error('Failed to check sidebar unlock:', e)
         this.setupRequired = false
       } finally {
         this.setupChecked = true
-        sessionStorage.setItem('setup_check_done', '1')
       }
     },
 
