@@ -26,6 +26,8 @@ export const useUserStore = defineStore('user', {
     _authInitialized: false,
     setupRequired: false,
     setupChecked: false,
+    _fetchUserProfilePromise: null as Promise<UserProfile> | null,
+    _refreshSidebarUnlockPromise: null as Promise<void> | null,
   }),
 
   getters: {
@@ -55,7 +57,9 @@ export const useUserStore = defineStore('user', {
           
           if (firebaseUser) {
             try {
-              await this.fetchUserProfile()
+              if (!this.userProfile || this.userProfile.firebase_uid !== firebaseUser.uid) {
+                await this.fetchUserProfile()
+              }
             } catch (e) {
               console.error('Failed to fetch user profile:', e)
             }
@@ -74,15 +78,23 @@ export const useUserStore = defineStore('user', {
      * Fetch user profile from backend /users/me endpoint.
      */
     async fetchUserProfile(): Promise<UserProfile> {
-      try {
-        const response = await httpClient.get<UserProfile>('/users/me')
-        this.userProfile = response.data
-        await this.refreshSidebarUnlock()
-        return response.data
-      } catch (err) {
-        console.error('Error fetching user profile:', err)
-        throw err
-      }
+      if (this._fetchUserProfilePromise) return this._fetchUserProfilePromise
+
+      this._fetchUserProfilePromise = (async () => {
+        try {
+          const response = await httpClient.get<UserProfile>('/users/me')
+          this.userProfile = response.data
+          await this.refreshSidebarUnlock()
+          return response.data
+        } catch (err) {
+          console.error('Error fetching user profile:', err)
+          throw err
+        } finally {
+          this._fetchUserProfilePromise = null
+        }
+      })()
+
+      return this._fetchUserProfilePromise
     },
 
     /**
@@ -96,7 +108,6 @@ export const useUserStore = defineStore('user', {
         const credential = await signInWithEmailAndPassword(auth, email, password)
         this.user = credential.user
         await this.fetchUserProfile()
-        await this.refreshSidebarUnlock()
         return credential.user
       } catch (err: any) {
         this.error = this._getErrorMessage(err.code)
@@ -131,21 +142,27 @@ export const useUserStore = defineStore('user', {
     },
 
     async refreshSidebarUnlock(): Promise<void> {
+      if (this._refreshSidebarUnlockPromise) return this._refreshSidebarUnlockPromise
       if (this.userProfile?.role !== 'owner') {
         this.setupRequired = false
         this.setupChecked = true
         return
       }
 
-      try {
-        const setup = await setupService.getSidebarUnlock()
-        this.setupRequired = !setup.unlock
-      } catch (e) {
-        console.error('Failed to check sidebar unlock:', e)
-        this.setupRequired = false
-      } finally {
-        this.setupChecked = true
-      }
+      this._refreshSidebarUnlockPromise = (async () => {
+        try {
+          const setup = await setupService.getSidebarUnlock()
+          this.setupRequired = !setup.unlock
+        } catch (e) {
+          console.error('Failed to check sidebar unlock:', e)
+          this.setupRequired = false
+        } finally {
+          this.setupChecked = true
+          this._refreshSidebarUnlockPromise = null
+        }
+      })()
+
+      return this._refreshSidebarUnlockPromise
     },
 
     /**
